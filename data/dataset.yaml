@@ -1,0 +1,45 @@
+train_dataset:
+  name: OHASISBIO_2018
+  wav_root_dir: /media/plerolland/LaBoite/PublicData/OHA2018
+  csv_root_dir: /media/plerolland/LaBoite/PublicData/OHA2018
+  stations:
+    MADW:
+      date_start: 20180214_000000
+      date_end: 20181103_000000
+    NEAMS:
+      date_start: 20180214_000000
+      date_end: 20181103_000000
+    RTJ:
+      date_start: 20180214_000000
+      date_end: 20181103_000000
+    SSEIR:
+      date_start: 20180214_000000
+      date_end: 20181103_000000
+    SSWIR:
+      date_start: 20180214_000000
+      date_end: 20181103_000000
+    SWAMS:
+      date_start: 20180214_000000
+      date_end: 20181103_000000
+    ELAN:
+      date_start: 20180624_000000
+      date_end: 20181103_000000
+    MADE:
+      date_start: 20180214_000000
+      date_end: 20180721_000000
+    WKER:
+      date_start: 20180214_000000
+      date_end: 20180721_000000
+  studies:
+    SEIR:
+      stations: [ RTJ, NEAMS, SSEIR, SWAMS, ELAN, SSWIR, MADW ]
+      date_start: 20180821_150000
+      date_end: 20180915_230000
+    swarm1:
+      stations: [ RTJ, NEAMS, SSEIR, SWAMS, ELAN, WKER, SSWIR, MADW, MADE ]
+      date_start: 20180710_010000
+      date_end: 20180718_130000
+    swarm2:
+      stations: [ RTJ, NEAMS, SSEIR, SWAMS, ELAN, SSWIR, MADW ]
+      date_start: 20180925_210000
+      date_end: 20181027_230000
