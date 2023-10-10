@@ -154,3 +154,6 @@ cython_debug/
 
 # Jetbrains gitignore part
 .idea
+
+# training models checkpoints
+checkpoint*

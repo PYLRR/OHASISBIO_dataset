@@ -7,7 +7,7 @@ import yaml
 from matplotlib import pyplot as plt
 from scipy import signal
 
-from utils.SoundFileManager import WavFilesManager
+from utils.data_reading.sound_file_manager import WavFilesManager
 
 
 class FeaturesExtractor:

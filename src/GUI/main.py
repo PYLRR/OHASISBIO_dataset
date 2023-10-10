@@ -1,7 +1,7 @@
 import sys
 
 from PySide6.QtWidgets import (QApplication)
-from SpectralViews import SpectralViewsWindow
+from GUI.windows.spectral_views import SpectralViewsWindow
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

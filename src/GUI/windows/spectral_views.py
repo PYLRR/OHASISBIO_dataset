@@ -5,8 +5,8 @@ from PySide6.QtCore import (QMetaObject, Qt)
 from PySide6.QtGui import (QAction)
 from PySide6.QtWidgets import (QMainWindow, QToolBar, QWidget)
 
-from GUI.SpectralView import SpectralView
-from utils.SoundFileManager import WavFilesManager
+from GUI.widgets.spectral_view import SpectralView
+from utils.data_reading.sound_file_manager import WavFilesManager
 
 """
     Custom Qt Widget to display several SpectralView

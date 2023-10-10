@@ -1,13 +1,12 @@
 import glob
 import math
 import os
-import re
 from collections import deque
 
 import numpy as np
 from tqdm import tqdm
 
-from utils.SoundFile import SoundFile, WavFile
+from utils.data_reading.sound_file import SoundFile, WavFile
 
 # this class provides an abstraction of the file reading part. Given a path containing data files, it enables to ask
 # for any time segment without having to deal with problems such as files borders
@@ -25,9 +24,7 @@ class SoundFileManager:
         self.cache = deque()
 
         # we consider the name of the directory as a station name
-        self.station_name = ""
-        if "/" in self.station_name:
-            self.station_name = self.path.split("/")[-1]
+        self.station_name = self.path.split("/")[-1]
 
         self._initialize_from_header()
 

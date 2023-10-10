@@ -9,13 +9,14 @@ from PySide6.QtCore import QTimer
 from PySide6.QtCore import (QDate, QDateTime, QTime, Qt)
 from playsound import playsound
 
-from GUI.Utilities.MplCanvas import MplCanvas
-from utils.FeaturesExtractor import STFTFeaturesExtractor
+from GUI.widgets.mpl_canvas import MplCanvas
+from utils.data_reading.features_extraction import STFTFeaturesExtractor
 
 
 # Window showing the spectrogram of a .wav folder
 class SpectralView(QtWidgets.QWidget):
-    MIN_SPECTRO_DURATION = datetime.timedelta(seconds=10)
+    MIN_SEGMENT_DURATION = datetime.timedelta(seconds=30)
+    MAX_SEGMENT_DURATION = datetime.timedelta(seconds=36_000)
 
     """
     Custom Qt Widget to explore a .wav folder by viewing spectrograms
@@ -27,6 +28,7 @@ class SpectralView(QtWidgets.QWidget):
         self.freq_range = [0, int(manager.sampling_f / 2)]
 
         self.manager = manager
+        self.spectralViews = SpectralViews
         self.STFT_computer = STFTFeaturesExtractor(self.manager, f_min=self.freq_range[0], f_max=self.freq_range[1])
 
         # timer used to prevent manual resizing of the window to cause lagging by drawing spectro too often
@@ -38,9 +40,7 @@ class SpectralView(QtWidgets.QWidget):
         self.control_layout = QtWidgets.QVBoxLayout()
         self.layout.addLayout(self.control_layout)
         self.label = QLabel(self)
-        self.label.setText(manager.path.split("/")[-1])
-        if len(manager.path.split("/")[-1]) == 0:
-            self.label.setText(manager.path.split("/")[-2])
+        self.label.setText(manager.station_name)
         font = QtGui.QFont()
         font.setBold(True)
         self.label.setFont(font)
@@ -52,12 +52,12 @@ class SpectralView(QtWidgets.QWidget):
         self.segment_length_label = QLabel(self)
         self.segment_length_label.setText("Segment duration (s)")
         self.segment_length_doubleSpinBox = QDoubleSpinBox(self)
-        self.segment_length_doubleSpinBox.setMinimum(60)
-        self.segment_length_doubleSpinBox.setMaximum(2**20)
+        self.segment_length_doubleSpinBox.setMinimum(self.MIN_SEGMENT_DURATION.total_seconds())
+        self.segment_length_doubleSpinBox.setMaximum(self.MAX_SEGMENT_DURATION.total_seconds())
         self.segment_length_doubleSpinBox.setValue(2*delta_view_s)
         self.segment_length_slider = QSlider(self)
-        self.segment_length_slider.setMinimum(60)
-        self.segment_length_slider.setMaximum(36000)
+        self.segment_length_slider.setMinimum(self.MIN_SEGMENT_DURATION.total_seconds())
+        self.segment_length_slider.setMaximum(self.MAX_SEGMENT_DURATION.total_seconds())
         self.segment_length_slider.setOrientation(Qt.Horizontal)
         self.segment_length_layout.addWidget(self.segment_length_label, 0, 0, 1, 1)
         self.segment_length_layout.addWidget(self.segment_length_doubleSpinBox, 1, 0, 1, 1)
@@ -71,7 +71,7 @@ class SpectralView(QtWidgets.QWidget):
         self.segment_date_dateTimeEdit = QDateTimeEdit(self)
         self.segment_date_dateTimeEdit.setInputMethodHints(Qt.ImhPreferNumbers)
         self.segment_date_dateTimeEdit.setDisplayFormat("yyyy/MM/dd hh:mm:ss")
-        self.segment_date_dateTimeEdit.setDateTime(DatetimeToQdatetime(manager.dataset_start, day_offset=1))
+        self.segment_date_dateTimeEdit.setDateTime(DatetimeToQdatetime(manager.dataset_start, day_offset=0))
         if event is not None:
             self.segment_date_dateTimeEdit.setDateTime(DatetimeToQdatetime(event))
         self.segment_date_slider = QSlider(self)
@@ -80,7 +80,7 @@ class SpectralView(QtWidgets.QWidget):
         self.segment_date_layout.addWidget(self.segment_date_dateTimeEdit, 1, 0, 1, 1)
         self.segment_date_layout.addWidget(self.segment_date_slider, 2, 0, 1, 3)
 
-        self.mpl = MplCanvas(self, width=12, height=6, dpi=120)
+        self.mpl = MplCanvas(self, width=12, height=8, dpi=120)
         self.mpl.axes.figure.subplots_adjust(left=0.05, right=0.95, bottom=0.2, top=0.9)
         self.layout.addWidget(self.mpl)
 
@@ -117,13 +117,13 @@ class SpectralView(QtWidgets.QWidget):
 
     def updateDateTimeEdit(self):
         delta = self.segment_length_doubleSpinBox.value() / 2 + 1  # 1 s of margin
-        delta = datetime.timedelta(seconds=max(delta, self.MIN_SPECTRO_DURATION.total_seconds()))
+        delta = datetime.timedelta(seconds=max(delta, self.MIN_SEGMENT_DURATION.total_seconds()))
         self.segment_date_dateTimeEdit.setDateTime(DatetimeToQdatetime(
             self.manager.dataset_start + delta + datetime.timedelta(seconds=self.segment_date_slider.value())))
 
     def updateDatesBounds(self):
         delta = self.segment_length_doubleSpinBox.value() / 2 + 1  # 1 s of margin
-        delta = datetime.timedelta(seconds=max(delta, self.MIN_SPECTRO_DURATION.total_seconds()))
+        delta = datetime.timedelta(seconds=max(delta, self.MIN_SEGMENT_DURATION.total_seconds()))
         start = self.manager.dataset_start + delta
         end = self.manager.dataset_end - delta
         self.segment_date_dateTimeEdit.setMinimumDateTime(DatetimeToQdatetime(start))
