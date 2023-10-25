@@ -1,4 +1,5 @@
 import datetime
+import os
 
 import numpy as np
 import pywt
@@ -6,11 +7,14 @@ import skimage
 import yaml
 from matplotlib import pyplot as plt
 from scipy import signal
+from tqdm import tqdm
 
 from utils.data_reading.sound_file_manager import WavFilesManager
 
 
 class FeaturesExtractor:
+    EXTENSION = ""
+
     def __init__(self, manager):
         self.manager = manager
 
@@ -18,7 +22,12 @@ class FeaturesExtractor:
         return self._get_features(self.manager.getSegment(start, end))
 
     def save_features(self, start, end, path):
-        self._save_features(self.get_features(start, end), path)
+        if not os.path.isfile(path):
+            self._save_features(self.get_features(start, end), path)
+
+    def save_features_batch(self, starts, ends, paths):
+        for i in range(len(starts)):
+            self.save_features(starts[i], ends[i], paths[i])
 
     def show_features(self, start, end):
         features = self.get_features(start, end)
@@ -34,6 +43,8 @@ class FeaturesExtractor:
         return None
 
 class STFTFeaturesExtractor(FeaturesExtractor):
+    EXTENSION = "png"
+
     def __init__(self, manager, nperseg=256, overlap=0.5, apply_log=True, f_min=0, f_max=None, vmin=None, vmax=None,
                  window="hamming"):
         super().__init__(manager)
@@ -91,6 +102,8 @@ class STFTFeaturesExtractor(FeaturesExtractor):
         plt.ylabel("frequency (Hz)")
 
 class DWTFeaturesExtractor(FeaturesExtractor):
+    EXTENSION = "npy"
+
     def __init__(self, manager, wavelet='bior2.4', n_levels=8, apply_log=False, vmin=None, vmax=None):
         super().__init__(manager)
         self.n_levels = n_levels
@@ -125,10 +138,18 @@ class DWTFeaturesExtractor(FeaturesExtractor):
         plt.colorbar()
 
 class RelativeDWTFeaturesExtractor(FeaturesExtractor):
+    EXTENSION = "npy"
+
     def __init__(self, manager, wavelet='bior2.4', n_levels=8):
         super().__init__(manager)
         self.n_levels = n_levels
         self.wavelet = wavelet
+
+    def save_features_batch(self, starts, ends, paths):
+        res = []
+        for start, end in tqdm(zip(starts, ends)):
+            res.append(self.get_features(start, end))
+        np.save(paths[0], np.array(res))
 
     def _get_features(self, data):
         features = pywt.wavedec(data, self.wavelet, level=self.n_levels)
@@ -145,6 +166,8 @@ class RelativeDWTFeaturesExtractor(FeaturesExtractor):
         plt.plot(features)
 
 class RawDataFeaturesExtractor(FeaturesExtractor):
+    EXTENSION = "npy"
+
     def __init__(self, manager):
         super().__init__(manager)
 
@@ -156,20 +179,3 @@ class RawDataFeaturesExtractor(FeaturesExtractor):
 
     def _show_features(self, features):
         plt.plot(features)
-
-if __name__ == "__main__":
-    with open("/home/plerolland/Bureau/Workspace/data/datasets/OHASISBIO-2020/index.yaml", "r") as f:
-        params = yaml.safe_load(f)
-    s = params["studies"]["CIR_20S"]
-    h = s["hydrophones_OHASISBIO"][1]
-
-    start = datetime.datetime(2020,6,2, 0, 45)
-    start = datetime.datetime(2020,4,25, 17, 30)
-    end = start + datetime.timedelta(minutes=2)
-    manager = WavFilesManager(params["wav_dir"] + h)
-    extractor = STFTFeaturesExtractor(manager)
-    #extractor = DWTFeaturesExtractor(manager, apply_log=True, vmin=20, vmax=80)
-    #extractor = RelativeDWTFeaturesExtractor(manager)
-    #extractor = RawDataFeaturesExtractor(manager)
-    feat = extractor.get_features(start, end)
-    extractor._show_features(feat)

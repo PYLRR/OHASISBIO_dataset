@@ -24,6 +24,7 @@ class SoundFileManager:
         self.cache = deque()
 
         # we consider the name of the directory as a station name
+        self.path = self.path.rstrip("/")
         self.station_name = self.path.split("/")[-1]
 
         self._initialize_from_header()

@@ -42,3 +42,35 @@ def resnet_model():
     model = tf.keras.Model(inputs=inputs, outputs=outputs, name="resnet_classifier")
 
     return model
+
+def custom_classif_model():
+    inputs = layers.Input(shape=(128, 128, 1))
+    x = layers.experimental.preprocessing.Rescaling(1. / 255)(inputs)
+    x = layers.Conv2D(16, 8, padding='same', activation='LeakyReLU')(x)
+    x = layers.Conv2D(16, 8, padding='same', activation='LeakyReLU')(x)
+    x = layers.Conv2D(16, 8, padding='same', activation='LeakyReLU')(x)
+    #x = layers.MaxPooling2D(2, padding='same')(x)
+    x = layers.Conv2D(32, 5, padding='same', activation='LeakyReLU')(x)
+    x = layers.Conv2D(32, 5, padding='same', activation='LeakyReLU')(x)
+    x = layers.Conv2D(32, 5, padding='same', activation='LeakyReLU')(x)
+    #x = layers.MaxPooling2D(4, padding='same')(x)
+    x = layers.Conv2D(64, 3, padding='same', activation='LeakyReLU')(x)
+    x = layers.Conv2D(64, 3, padding='same', activation='LeakyReLU')(x)
+    x = layers.Conv2D(64, 3, padding='same', activation='LeakyReLU')(x)
+    #x = layers.MaxPooling2D(4, padding='same')(x)
+    x = layers.Conv2D(128, 2, padding='same', activation='LeakyReLU')(x)
+    x = layers.Conv2D(128, 2, padding='same', activation='LeakyReLU')(x)
+    x = layers.Conv2D(128, 2, padding='same', activation='LeakyReLU')(x)
+    x = layers.Conv2D(1, 2, padding='same', activation='LeakyReLU')(x)
+    x = layers.Flatten()(x)
+    x = layers.Dense(256, activation='LeakyReLU')(x)
+    x = layers.Dropout(0.5)(x)
+    x = layers.Dense(256, activation='LeakyReLU')(x)
+    x = layers.Dropout(0.5)(x)
+    x = layers.Dense(256, activation='LeakyReLU')(x)
+    x = layers.Dropout(0.5)(x)
+    outputs = layers.Dense(1, activation='sigmoid')(x)
+
+    model = tf.keras.Model(inputs, outputs, name="custom_classifier")
+
+    return model

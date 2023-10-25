@@ -43,3 +43,53 @@ train_dataset:
       stations: [ RTJ, NEAMS, SSEIR, SWAMS, ELAN, SSWIR, MADW ]
       date_start: 20180925_210000
       date_end: 20181027_230000
+test_dataset_OHA:
+  name: OHASISBIO_2020
+  wav_root_dir: /media/plerolland/LaBoite/PublicData/OHA2020
+  csv_root_dir: /media/plerolland/LaBoite/PublicData/OHA2020
+  stations:
+    ELAN:
+      date_start: 20200604_000000
+      date_end: 20200610_000000
+    MADW:
+      date_start: 20200604_000000
+      date_end: 20200610_000000
+    RTJ:
+      date_start: 20200604_000000
+      date_end: 20200610_000000
+    SSEIR:
+      date_start: 20200604_000000
+      date_end: 20200610_000000
+    SWAMS:
+      date_start: 20200604_000000
+      date_end: 20200610_000000
+    WKER2:
+      date_start: 20200604_000000
+      date_end: 20200610_000000
+  studies:
+    CIR_23S:
+      stations: [ ELAN, MADW, RTJ, SSEIR, SWAMS, WKER2 ]
+      date_start: 20200604_000000
+      date_end: 20200610_000000
+test_dataset_HYD:
+  name: HYDROMOMAR_2013
+  wav_root_dir: /media/plerolland/LaBoite/PublicData/HYD2013
+  csv_root_dir: /media/plerolland/LaBoite/PublicData/HYD2013
+  stations:
+    LS:
+      date_start: 20131111_000000
+      date_end: 20131117_000000
+    M2:
+      date_start: 20131111_000000
+      date_end: 20131117_000000
+    M6:
+      date_start: 20131111_000000
+      date_end: 20131117_000000
+    M7:
+      date_start: 20131111_000000
+      date_end: 20131117_000000
+  studies:
+    H2aS:
+      stations: [ LS, M2, M6, M7 ]
+      date_start: 20131111_000000
+      date_end: 20131117_000000
