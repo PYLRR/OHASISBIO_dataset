@@ -23,7 +23,6 @@ def lines_to_line_generator(csv_lines):
             res.extend(line[2:])
             yield tuple(res)
 
-
 def load_spectro(file_path, size, channels):
     img = tf.io.read_file(file_path)
     img = tf.image.decode_png(img, channels=channels)  # RGB or grayscale
