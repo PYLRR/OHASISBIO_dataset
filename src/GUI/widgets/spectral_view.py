@@ -10,7 +10,7 @@ from PySide6.QtCore import (QDate, QDateTime, QTime, Qt)
 from playsound import playsound
 
 from GUI.widgets.mpl_canvas import MplCanvas
-from utils.data_reading.features_extraction import STFTFeaturesExtractor
+from utils.data_reading.features_extractor import STFTFeaturesExtractor
 
 
 # Window showing the spectrogram of a .wav folder

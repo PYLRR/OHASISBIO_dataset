@@ -7,7 +7,6 @@ import skimage
 import yaml
 from matplotlib import pyplot as plt
 from scipy import signal
-from tqdm import tqdm
 
 from utils.data_reading.sound_file_manager import WavFilesManager
 
@@ -145,11 +144,12 @@ class RelativeDWTFeaturesExtractor(FeaturesExtractor):
         self.n_levels = n_levels
         self.wavelet = wavelet
 
-    def save_features_batch(self, starts, ends, paths):
-        res = []
-        for start, end in tqdm(zip(starts, ends)):
-            res.append(self.get_features(start, end))
-        np.save(paths[0], np.array(res))
+    def save_features_batch_single_file(self, starts, ends, path):
+        if not os.path.isfile(path):
+            res = []
+            for start, end in zip(starts, ends):
+                res.append(self.get_features(start, end))
+            np.save(path, np.array(res))
 
     def _get_features(self, data):
         features = pywt.wavedec(data, self.wavelet, level=self.n_levels)

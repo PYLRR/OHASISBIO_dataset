@@ -105,10 +105,11 @@ class SoundFileManager:
         first_file, last_file = self._getFilesToLoadFromSegment(start, end)
 
         file_numbers = range(first_file, last_file + 1)
-        data = []
+        data = np.empty(1, dtype=np.int64)
         for file_number in file_numbers:
             file = self.loadFile(file_number)
-            data = np.concatenate((data, file.get_data(start=start, end=end)))
+            file_data = file.get_data(start=start, end=end)
+            data = np.concatenate((data, file_data), dtype=file_data.dtype)
 
         if len(data) == 0:
             print(f"0-length data fetched for files {file_numbers} from date {start} to {end}")
