@@ -28,6 +28,41 @@ def time_segmenter_model():
 
     return model
 
+def phasenet_like_model():
+    inputs = layers.Input(shape=(None,))
+
+    x = layers.Conv1D(8, 7, activation='relu')(inputs)
+    x1 = layers.Conv1D(8, 7, activation='relu')(x)
+    x = layers.Conv1D(8, 7, stride=4, activation='relu')(x1)
+    x2 = layers.Conv1D(11, 7, activation='relu')(x)
+    x = layers.Conv1D(11, 7, stride=4, activation='relu')(x2)
+    x3 = layers.Conv1D(16, 7, activation='relu')(x)
+    x = layers.Conv1D(16, 7, stride=4, activation='relu')(x3)
+    x4 = layers.Conv1D(22, 7, activation='relu')(x)
+    x = layers.Conv1D(22, 7, stride=4, activation='relu')(x4)
+
+    x = layers.Conv1D(32, 7, activation='relu')(x)
+
+
+    x = layers.Conv1DTranspose(22, 7, stride=4, activation='relu')(x)
+    x = layers.concat(x4, x)
+    x = layers.Conv1D(22, 7, activation='relu')(x)
+    x = layers.Conv1DTranspose(16, 7, stride=4, activation='relu')(x)
+    x = layers.concat(x3, x)
+    x = layers.Conv1D(16, 7, activation='relu')(x)
+    x = layers.Conv1DTranspose(11, 7, stride=4, activation='relu')(x)
+    x = layers.concat(x2, x)
+    x = layers.Conv1D(11, 7, activation='relu')(x)
+    x = layers.Conv1DTranspose(8, 7, stride=4, activation='relu')(x)
+    x = layers.concat(x1, x)
+    x = layers.Conv1D(8, 7, activation='relu')(x)
+
+    outputs = layers.Conv1D(1, 7, activation='sigmoid')(x)
+
+    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="phasenet_like")
+
+    return model
+
 def resnet_model():
     inputs = layers.Input(shape=(224, 224, 3))
 

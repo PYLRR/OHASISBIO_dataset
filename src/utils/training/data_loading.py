@@ -1,7 +1,11 @@
 import csv
 
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+from scipy.interpolate import interp1d
+from tqdm import tqdm
+
 
 def lines_to_line_generator(csv_lines):
     while True:
@@ -9,6 +13,15 @@ def lines_to_line_generator(csv_lines):
             res = [line[0]]
             res.extend(line[2:])
             yield tuple(res)
+
+
+def lines_to_line_generator_waveform(csv_lines):
+    while True:
+        for line in csv_lines:
+            res = [np.load(line[0])]
+            res.append(line[2:])
+            yield tuple(res)
+
 
 def load_spectro(file_path, size, channels):
     img = tf.io.read_file(file_path)
@@ -20,7 +33,7 @@ def load_spectro(file_path, size, channels):
 
 def get_line_to_spectro_seg(size, duration_s, channels=1, objective_curve_width=10):
     time_res = duration_s / size[1]
-    gaussian_stdvar = objective_curve_width / time_res
+    objective_curve_width = objective_curve_width / time_res
 
     def line_to_spectro_seg(input_data):
         file_path = input_data[0]
@@ -42,19 +55,60 @@ def get_line_to_spectro_seg(size, duration_s, channels=1, objective_curve_width=
             events_array = events_array.write(e, pos)
         events = events_array.stack()
 
-        #distrib = tfp.distributions.Normal(loc=0, scale=gaussian_stdvar)
         y_list = []  # list of tensors that each represent 1 time step, will be concatenated as function output
         for i in range(size[1]):
             d = tf.math.reduce_min(
                 tf.abs(float(i) - events))  # "distance" in pixels separating this time step from the closest event
-            y_list.append(tf.math.maximum((gaussian_stdvar-d)/gaussian_stdvar, tf.zeros(1)))
-            #y_list.append(
-            #    distrib.prob(d) / distrib.prob(0))  # assigned ground truth of this time step, normalized to [0,1]
+            y_list.append(tf.math.maximum((objective_curve_width - d) / objective_curve_width, tf.zeros(1)))
 
         y = tf.stack(y_list)  # obtain the tensor containing all assigned ground truth values
         return img, y
 
     return line_to_spectro_seg
+
+
+def get_line_to_dataset_waveform(size, duration_s, objective_curve_width=10, min_val=10 ** (-35 / 20),
+                                 max_val=10 ** (140 / 20)):
+    time_res = duration_s / size
+    objective_curve_width = objective_curve_width / time_res
+
+    def line_to_dataset_waveform(data):
+        X, Y = [], []
+        for d in tqdm(data):
+            waveform = np.load(d[0])[:size]
+
+            target_indices = np.linspace(0, len(waveform) - 1, size)
+            interp_f = interp1d(np.arange(len(waveform)), waveform, kind='linear', fill_value="extrapolate")
+            waveform = interp_f(target_indices)
+
+            waveform[np.abs(waveform) < min_val] = min_val
+            waveform[np.abs(waveform) > max_val] = max_val
+            waveform[waveform > 0] = (waveform[waveform > 0] - min_val) / max_val
+            waveform[waveform < 0] = (waveform[waveform < 0] + min_val) / max_val
+
+            X.append(np.array(waveform, dtype=np.float32))
+            events = d[2:]
+            nb_events = int(len(events))
+
+            if nb_events == 0:
+                # if the sample is negative we consider it contains no signal of interest
+                Y.append(np.zeros(size, dtype=np.float16))
+                continue
+
+            # we have a positive sample, we extract the location of the signals of interest in it
+            events = [(duration_s / 2 + float(e)) / time_res for e in events]
+
+            res = np.arange(size)
+            # get the distance between each time step and the closest event from events array
+            res = np.min(np.abs(np.subtract.outer(res, events)), axis=1)
+            # use this distance to make "triangles" around events
+            res = ((objective_curve_width - res) / objective_curve_width).astype(np.float16)
+            res[res < 0] = 0
+
+            Y.append(res)
+        return np.array(X), np.array(Y)
+
+    return line_to_dataset_waveform
 
 
 def get_line_to_spectro_class(size, channels=1):

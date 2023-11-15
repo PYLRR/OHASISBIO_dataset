@@ -1,14 +1,10 @@
-import datetime
 import os
-
 import numpy as np
 import pywt
 import skimage
-import yaml
 from matplotlib import pyplot as plt
 from scipy import signal
-
-from utils.data_reading.sound_file_manager import WavFilesManager
+from scipy.signal import decimate
 
 
 class FeaturesExtractor:
@@ -165,13 +161,15 @@ class RelativeDWTFeaturesExtractor(FeaturesExtractor):
     def _show_features(self, features):
         plt.plot(features)
 
-class RawDataFeaturesExtractor(FeaturesExtractor):
+class WaveformDataFeaturesExtractor(FeaturesExtractor):
     EXTENSION = "npy"
 
-    def __init__(self, manager):
+    def __init__(self, manager, downsampling_factor=1):
         super().__init__(manager)
+        self.downsampling_factor = downsampling_factor
 
     def _get_features(self, data):
+        data = decimate(data, self.downsampling_factor).astype(np.int32)
         return data
 
     def _save_features(self, features, path):
