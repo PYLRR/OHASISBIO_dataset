@@ -7,20 +7,14 @@ from scipy.interpolate import interp1d
 from tqdm import tqdm
 
 
-def lines_to_line_generator(csv_lines):
+def lines_to_line_generator(csv_lines, repeat=True):
     while True:
         for line in csv_lines:
             res = [line[0]]
             res.extend(line[2:])
             yield tuple(res)
-
-
-def lines_to_line_generator_waveform(csv_lines):
-    while True:
-        for line in csv_lines:
-            res = [np.load(line[0])]
-            res.append(line[2:])
-            yield tuple(res)
+        if not repeat:
+            return
 
 
 def load_spectro(file_path, size, channels):
@@ -62,6 +56,7 @@ def get_line_to_spectro_seg(size, duration_s, channels=1, objective_curve_width=
             y_list.append(tf.math.maximum((objective_curve_width - d) / objective_curve_width, tf.zeros(1)))
 
         y = tf.stack(y_list)  # obtain the tensor containing all assigned ground truth values
+        y = tf.reshape(y, (size[1],))
         return img, y
 
     return line_to_spectro_seg
@@ -111,13 +106,15 @@ def get_line_to_dataset_waveform(size, duration_s, objective_curve_width=10, min
     return line_to_dataset_waveform
 
 
-def get_line_to_spectro_class(size, channels=1):
-    def line_to_spectro_class(file_path):
-        img = load_spectro(file_path, size, channels)
+def get_load_spectro_for_class(size=128, channels=1):
+    def load_spectro_for_class(file_path):
+        img = tf.io.read_file(file_path)
+        img = tf.image.decode_png(img, channels=channels)  # RGB
+        img = tf.image.convert_image_dtype(img, tf.uint8)  # 0-255 pixels
+        img = tf.image.resize(img, size=(size, size))  # resize to standard resnet input size
 
         if tf.strings.regex_full_match(file_path, ".*negative.*"):
             return img, 0
         else:
             return img, 1
-
-    return line_to_spectro_class
+    return load_spectro_for_class

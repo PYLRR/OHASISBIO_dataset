@@ -15,4 +15,3 @@ def shuffle_lists_by_group(list_of_lists_groups, seed=0):
             assert len(_list) == l, "different lists of the same group have different lengths"
             np.random.seed(seed)
             np.random.shuffle(_list)
-            pass

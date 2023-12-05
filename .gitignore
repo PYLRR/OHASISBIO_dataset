@@ -1,3 +1,10 @@
+# data
+*.png
+
+# training models checkpoints
+checkpoint*
+save*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -154,6 +161,3 @@ cython_debug/
 
 # Jetbrains gitignore part
 .idea
-
-# training models checkpoints
-checkpoint*

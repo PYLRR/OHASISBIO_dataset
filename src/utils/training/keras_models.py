@@ -28,49 +28,77 @@ def time_segmenter_model():
 
     return model
 
-def phasenet_like_model():
-    inputs = layers.Input(shape=(None,))
 
-    x = layers.Conv1D(8, 7, activation='relu')(inputs)
-    x1 = layers.Conv1D(8, 7, activation='relu')(x)
-    x = layers.Conv1D(8, 7, stride=4, activation='relu')(x1)
-    x2 = layers.Conv1D(11, 7, activation='relu')(x)
-    x = layers.Conv1D(11, 7, stride=4, activation='relu')(x2)
-    x3 = layers.Conv1D(16, 7, activation='relu')(x)
-    x = layers.Conv1D(16, 7, stride=4, activation='relu')(x3)
-    x4 = layers.Conv1D(22, 7, activation='relu')(x)
-    x = layers.Conv1D(22, 7, stride=4, activation='relu')(x4)
+def get_phasenet_model(SIZE):
+    def phasenet_like_model():
+        inputs = layers.Input(shape=(SIZE,))
 
-    x = layers.Conv1D(32, 7, activation='relu')(x)
+        x = layers.Reshape((SIZE, 1))(inputs)
 
+        x = layers.Conv1D(8, 7, padding='same', activation='relu')(x)
+        x1 = layers.Conv1D(8, 7, padding='same', activation='relu')(x)
+        x = layers.Conv1D(8, 7, padding='same', strides=4, activation='relu')(x1)
+        x2 = layers.Conv1D(11, 7, padding='same', activation='relu')(x)
+        x = layers.Conv1D(11, 7, padding='same', strides=4, activation='relu')(x2)
+        x3 = layers.Conv1D(16, 7, padding='same', activation='relu')(x)
+        x = layers.Conv1D(16, 7, padding='same', strides=4, activation='relu')(x3)
+        x4 = layers.Conv1D(22, 7, padding='same', activation='relu')(x)
+        x = layers.Conv1D(22, 7, padding='same', strides=4, activation='relu')(x4)
+        x5 = layers.Conv1D(29, 7, padding='same', activation='relu')(x)
+        x = layers.Conv1D(29, 7, padding='same', strides=4, activation='relu')(x5)
+        x6 = layers.Conv1D(37, 7, padding='same', activation='relu')(x)
+        x = layers.Conv1D(37, 7, padding='same', strides=4, activation='relu')(x6)
 
-    x = layers.Conv1DTranspose(22, 7, stride=4, activation='relu')(x)
-    x = layers.concat(x4, x)
-    x = layers.Conv1D(22, 7, activation='relu')(x)
-    x = layers.Conv1DTranspose(16, 7, stride=4, activation='relu')(x)
-    x = layers.concat(x3, x)
-    x = layers.Conv1D(16, 7, activation='relu')(x)
-    x = layers.Conv1DTranspose(11, 7, stride=4, activation='relu')(x)
-    x = layers.concat(x2, x)
-    x = layers.Conv1D(11, 7, activation='relu')(x)
-    x = layers.Conv1DTranspose(8, 7, stride=4, activation='relu')(x)
-    x = layers.concat(x1, x)
-    x = layers.Conv1D(8, 7, activation='relu')(x)
+        x = layers.Conv1D(46, 4, padding='same', activation='relu')(x)
 
-    outputs = layers.Conv1D(1, 7, activation='sigmoid')(x)
+        x = layers.Conv1DTranspose(37, 7, padding='same', strides=4, activation='relu')(x)
+        x = layers.concatenate([x6, x])
+        x = layers.Conv1D(37, 7, padding='same', activation='relu')(x)
+        x = layers.Conv1DTranspose(29, 7, padding='same', strides=4, activation='relu')(x)
+        x = layers.concatenate([x5, x])
+        x = layers.Conv1D(29, 7, padding='same', activation='relu')(x)
+        x = layers.Conv1DTranspose(22, 7, padding='same', strides=4, activation='relu')(x)
+        x = layers.concatenate([x4, x])
+        x = layers.Conv1D(22, 7, padding='same', activation='relu')(x)
+        x = layers.Conv1DTranspose(16, 7, padding='same', strides=4, activation='relu')(x)
+        x = layers.concatenate([x3, x])
+        x = layers.Conv1D(16, 7, padding='same', activation='relu')(x)
+        x = layers.Conv1DTranspose(11, 7, padding='same', strides=4, activation='relu')(x)
+        x = layers.concatenate([x2, x])
+        x = layers.Conv1D(11, 7, padding='same', activation='relu')(x)
+        x = layers.Conv1DTranspose(8, 7, padding='same', strides=4, activation='relu')(x)
+        x = layers.concatenate([x1, x])
+        x = layers.Conv1D(8, 7, padding='same', activation='relu')(x)
+        x = layers.Conv1D(1, 7, padding='same', activation='sigmoid')(x)
 
-    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="phasenet_like")
+        outputs = layers.Flatten()(x)
 
-    return model
+        model = tf.keras.Model(inputs=inputs, outputs=outputs, name="phasenet_like")
+
+        return model
+    return phasenet_like_model
 
 def resnet_model():
     inputs = layers.Input(shape=(224, 224, 3))
+    x = tf.keras.applications.resnet50.preprocess_input(inputs)
 
-    base = resnet50.ResNet50(weights="imagenet", include_top=False)(inputs)
+    base = resnet50.ResNet50(weights="imagenet", include_top=False)
+    for layer in base.layers[:-5]:
+        layer.trainable = False
+
+    base = base(x)
 
     x = layers.MaxPooling2D(pool_size=(7, 7))(base)
     x = layers.Flatten()(x)
-    x = layers.Dense(256, activation="LeakyReLU")(x)
+    x = layers.Dense(512, activation=layers.LeakyReLU())(x)
+    x = layers.Dropout(0.5)(x)
+    x = layers.Dense(512, activation=layers.LeakyReLU())(x)
+    x = layers.Dropout(0.5)(x)
+    x = layers.Dense(512, activation=layers.LeakyReLU())(x)
+    x = layers.Dropout(0.5)(x)
+    x = layers.Dense(256, activation=layers.LeakyReLU())(x)
+    x = layers.Dropout(0.5)(x)
+    x = layers.Dense(128, activation=layers.LeakyReLU())(x)
     x = layers.Dropout(0.5)(x)
     outputs = layers.Dense(1, activation="sigmoid")(x)
 
@@ -78,34 +106,37 @@ def resnet_model():
 
     return model
 
-def custom_classif_model():
-    inputs = layers.Input(shape=(128, 128, 1))
-    x = layers.experimental.preprocessing.Rescaling(1. / 255)(inputs)
-    x = layers.Conv2D(16, 8, padding='same', activation='LeakyReLU')(x)
-    x = layers.Conv2D(16, 8, padding='same', activation='LeakyReLU')(x)
-    x = layers.Conv2D(16, 8, padding='same', activation='LeakyReLU')(x)
-    #x = layers.MaxPooling2D(2, padding='same')(x)
-    x = layers.Conv2D(32, 5, padding='same', activation='LeakyReLU')(x)
-    x = layers.Conv2D(32, 5, padding='same', activation='LeakyReLU')(x)
-    x = layers.Conv2D(32, 5, padding='same', activation='LeakyReLU')(x)
-    #x = layers.MaxPooling2D(4, padding='same')(x)
-    x = layers.Conv2D(64, 3, padding='same', activation='LeakyReLU')(x)
-    x = layers.Conv2D(64, 3, padding='same', activation='LeakyReLU')(x)
-    x = layers.Conv2D(64, 3, padding='same', activation='LeakyReLU')(x)
-    #x = layers.MaxPooling2D(4, padding='same')(x)
-    x = layers.Conv2D(128, 2, padding='same', activation='LeakyReLU')(x)
-    x = layers.Conv2D(128, 2, padding='same', activation='LeakyReLU')(x)
-    x = layers.Conv2D(128, 2, padding='same', activation='LeakyReLU')(x)
-    x = layers.Conv2D(1, 2, padding='same', activation='LeakyReLU')(x)
-    x = layers.Flatten()(x)
-    x = layers.Dense(256, activation='LeakyReLU')(x)
-    x = layers.Dropout(0.5)(x)
-    x = layers.Dense(256, activation='LeakyReLU')(x)
-    x = layers.Dropout(0.5)(x)
-    x = layers.Dense(256, activation='LeakyReLU')(x)
-    x = layers.Dropout(0.5)(x)
-    outputs = layers.Dense(1, activation='sigmoid')(x)
 
-    model = tf.keras.Model(inputs, outputs, name="custom_classifier")
+def get_custom_classif_model(SIZE):
+    def custom_classif_model():
+        inputs = layers.Input(shape=SIZE)
+        x = layers.experimental.preprocessing.Rescaling(1. / 255)(inputs)
+        x = layers.Conv2D(16, 8, padding='same', activation=layers.LeakyReLU())(x)
+        x = layers.Conv2D(16, 8, padding='same', activation=layers.LeakyReLU())(x)
+        x = layers.Conv2D(16, 8, padding='same', activation=layers.LeakyReLU())(x)
+        x = layers.MaxPooling2D(2, padding='same')(x)
+        x = layers.Conv2D(32, 5, padding='same', activation=layers.LeakyReLU())(x)
+        x = layers.Conv2D(32, 5, padding='same', activation=layers.LeakyReLU())(x)
+        x = layers.Conv2D(32, 5, padding='same', activation=layers.LeakyReLU())(x)
+        x = layers.MaxPooling2D(4, padding='same')(x)
+        x = layers.Conv2D(64, 3, padding='same', activation=layers.LeakyReLU())(x)
+        x = layers.Conv2D(64, 3, padding='same', activation=layers.LeakyReLU())(x)
+        x = layers.Conv2D(64, 3, padding='same', activation=layers.LeakyReLU())(x)
+        x = layers.MaxPooling2D(4, padding='same')(x)
+        x = layers.Conv2D(128, 2, padding='same', activation=layers.LeakyReLU())(x)
+        x = layers.Conv2D(128, 2, padding='same', activation=layers.LeakyReLU())(x)
+        x = layers.Conv2D(128, 2, padding='same', activation=layers.LeakyReLU())(x)
+        x = layers.Conv2D(1, 2, padding='same', activation=layers.LeakyReLU())(x)
+        x = layers.Flatten()(x)
+        x = layers.Dense(256, activation=layers.LeakyReLU())(x)
+        x = layers.Dropout(0.5)(x)
+        x = layers.Dense(256, activation=layers.LeakyReLU())(x)
+        x = layers.Dropout(0.5)(x)
+        x = layers.Dense(256, activation=layers.LeakyReLU())(x)
+        x = layers.Dropout(0.5)(x)
+        outputs = layers.Dense(1, activation='sigmoid')(x)
 
-    return model
+        model = tf.keras.Model(inputs, outputs, name="custom_classifier")
+
+        return model
+    return custom_classif_model

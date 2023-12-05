@@ -1,3 +1,4 @@
+import datetime
 import glob
 import math
 import os
@@ -7,6 +8,9 @@ import numpy as np
 from tqdm import tqdm
 
 from utils.data_reading.sound_file import SoundFile, WavFile
+
+# epsilon to compare two close datetimes
+TIMEDELTA_EPSILON = datetime.timedelta(microseconds=10**4)
 
 # this class provides an abstraction of the file reading part. Given a path containing data files, it enables to ask
 # for any time segment without having to deal with problems such as files borders
@@ -137,8 +141,8 @@ class SoundFileManager:
             yield points
 
     def _getFilesToLoadFromSegment(self, start, end):
-        assert start >= self.dataset_start, "start is before the first file"
-        assert end <= self.dataset_end, "end is after the last file"
+        assert start >= self.dataset_start - TIMEDELTA_EPSILON, "start is before the first file"
+        assert end <= self.dataset_end + TIMEDELTA_EPSILON, "end is after the last file"
 
         first_file = self.locateAndLoadFile(start)
         segment_length = end - start
