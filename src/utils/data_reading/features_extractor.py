@@ -41,7 +41,7 @@ class STFTFeaturesExtractor(FeaturesExtractor):
     EXTENSION = "png"
 
     def __init__(self, manager, nperseg=256, overlap=0.5, apply_log=True, f_min=0, f_max=None, vmin=None, vmax=None,
-                 window="hamming"):
+                 window="hamming", cmap="inferno", axis_labels=True):
         super().__init__(manager)
         self.apply_log = apply_log
         self.nperseg = nperseg
@@ -51,6 +51,8 @@ class STFTFeaturesExtractor(FeaturesExtractor):
         self.vmin = vmin
         self.vmax = vmax
         self.window = window
+        self.cmap = cmap
+        self.axis_labels = axis_labels
 
     def _get_features(self, data):
         f, t, spectro = signal.spectrogram(data, fs=self.manager.sampling_f, nperseg=self.nperseg,
@@ -92,9 +94,11 @@ class STFTFeaturesExtractor(FeaturesExtractor):
     def _show_features(self, features):
         (f, t, spectro) = features
         extent, aspect = self._get_extent_and_aspect(features)
-        plt.imshow(spectro, extent=extent, aspect=aspect, vmin=self.vmin, vmax=self.vmax)
-        plt.xlabel("time (s)")
-        plt.ylabel("frequency (Hz)")
+        plt.imshow(spectro, extent=extent, aspect=aspect, vmin=self.vmin, vmax=self.vmax, cmap=self.cmap)
+
+        if self.axis_labels:
+            plt.xlabel("time (s)")
+            plt.ylabel("frequency (Hz)")
 
 class DWTFeaturesExtractor(FeaturesExtractor):
     EXTENSION = "npy"

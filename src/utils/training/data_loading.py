@@ -113,7 +113,7 @@ def get_load_spectro_for_class(size=128, channels=1):
         img = tf.image.convert_image_dtype(img, tf.uint8)  # 0-255 pixels
         img = tf.image.resize(img, size=(size, size))  # resize to standard resnet input size
 
-        if tf.strings.regex_full_match(file_path, ".*negative.*"):
+        if tf.strings.regex_full_match(file_path, ".*negatives.*"):
             return img, 0
         else:
             return img, 1

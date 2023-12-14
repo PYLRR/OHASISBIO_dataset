@@ -71,7 +71,7 @@ def evaluate_peaks(ground_truth, detections, allowed_error):
 def compute_ROC(TP, P, FP, N, thresh_delta=0.001):
     TPr = []
     FPr = []
-    for thresh in np.arange(0, 1, thresh_delta):
+    for thresh in np.arange(0, 1+thresh_delta, thresh_delta):
         TPr.append(np.count_nonzero(TP > thresh) / P)
         FPr.append(np.count_nonzero(FP > thresh) / N)
     return TPr, FPr
