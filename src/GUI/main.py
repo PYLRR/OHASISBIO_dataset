@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (QApplication)
 from GUI.windows.spectral_views import SpectralViewsWindow
 
 if __name__ == "__main__":
+    # main to call in order to launch the dataset exploration tool.
     app = QApplication(sys.argv)
     app.setStyleSheet("QLabel{font-size: 16pt;} QDateTimeEdit{font-size: 16pt;} QPushButton{font-size: 20pt;} QDoubleSpinBox{font-size: 16pt;}")
 

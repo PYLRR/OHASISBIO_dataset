@@ -8,60 +8,86 @@ import re
 import locale
 
 class SoundFile:
-    EXTENSION = ""
-    MAX_VALUE = 2**23-1
+    """ Class representing a single sound file.
+    """
+    EXTENSION = ""  # extension of the files like ".wav"
 
-    # path: path of the file which we will look for
-    # skip_data: if True, only the header of the file will be read, so that it is a quick operation
-    def __init__(self, path, skip_data=False):
-        self.header = {}
-        self.data = []
+    def __init__(self, path, skip_data=False, identifier=None):
+        """ Constructor reading file metadata and content if required.
+        :param path: The path of the file.
+        :param skip_data: If True, we only read the metadata of the file. Else, we also read its content.
+        :param identifier: The ID of this file, that will be used to compare it with another file. If unspecified,
+        path is used.
+        """
+        self.header = {}  # dict that contains the metadata of the file
+        self.data = []  # data of the file
         self.path = path
-        self.read_header()
+        self.identifier = self.path if identifier is None else identifier
+        self._read_header()  # read the metadata of the file
         if not skip_data:
-            self.read_data()
+            self.read_data()  # read the data of the file
 
-    def read_header(self):
-        pass
+    def _read_header(self):
+        """ Read the metadata of the file and update self.header.
+        :return: None.
+        """
+        pass  # abstract method
 
-    # to use when the file was previously header-ony loaded but we now want its data
     def read_data(self):
-        pass
+        """ Read the data of the file and update self.data. Public method because in case the file was previously loaded
+        but without reading its data, it may be necessary to ask to read the data.
+        :return: None.
+        """
+        pass  # abstract method
 
-    # load the data of the file but enable to only read after and before a datetime
     def get_data(self, start=None, end=None):
+        """ Given a start datetime and an end datetime, read the data. In case the bounds are outside of the file, the
+        method does not throw an exception and simply return the data from its start, and/or to its end.
+        :param start: Start datetime of the segment.
+        :param end: End datetime of the segment.
+        :return: The required data.
+        """
         data = self.data
         if start is not None and end is not None:
             assert end > start, "required end is before or equal to the start"
+
         if start is not None:
+            # select the data starting after start
             offset = start - self.header["start_date"]
             offset_points = int(offset.total_seconds() * self.header["sampling_frequency"])
             if offset_points > 0:
                 data = data[offset_points:]
+
         if end is not None:
+            # select the data ending before end
             offset = self.header["end_date"] - end
             offset_points = int(offset.total_seconds() * self.header["sampling_frequency"])
             if offset_points > 0:
                 data = data[:-offset_points]
         return data
 
-    def write_wav(self, path):
-        to_write = np.int32((2**15-1) * self.data / self.MAX_VALUE)
-        scipy.io.wavfile.write(path, int(self.header["sampling_frequency"]), to_write)
-
-    # overrides == operator with str so that we can look for a file in a list with its path
     def __eq__(self, other):
-        if type(other) == str:
-            return self.path == other
-        if type(other) == type(self):
-            return self.path == other.path
+        """ Test if another file has a similar identifier, or if an item is the file identifier.
+        :param other: Another SoundFile or an object of the class of self.identifier.
+        :return: True if other is a SoundFile with the same identifier or if other is our identifier, else False.
+        """
+        if type(other) == type(self.identifier):  # the other object may be the identifier
+            return self.identifier == other
+        if type(other) == type(self):  # the other object is a SoundFile that may have the same identifier
+            return self.identifier == other.identifier
         return False
 
 class WavFile(SoundFile):
+    """ Class representing .wav files. We expect wav files to be named with their start time as YYYYMMDD_hhmmss.
+    """
     EXTENSION = "wav"
 
-    def read_header(self):
+    def _read_header(self):
+        """ Read the metadata of the file using its name and header and update self.header.
+        :return: None.
+        """
         with wave.open(self.path, 'rb') as file:
+            # get information from the file header
             self.header["sampling_frequency"] = file.getframerate()
             self.header["samples"] = file.getnframes()
 
@@ -72,4 +98,10 @@ class WavFile(SoundFile):
         self.header["end_date"] = self.header["start_date"] + self.header["duration"]
 
     def read_data(self):
+        """ Read the data of the file using scipy and update self.data.
+        :return: None.
+        """
         _, self.data = scipy.io.wavfile.read(self.path)
+        if self.data.dtype == np.int16:  # 16 bits format : it has been divided by 2^14 and we thus put it back in uPa
+            self.data = self.data.astype(np.int32)
+            self.data = self.data * 2**14

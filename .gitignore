@@ -1,6 +1,7 @@
 # data
 *.png
 *.npy
+data/*
 
 # training models checkpoints
 checkpoint*
@@ -162,3 +163,4 @@ cython_debug/
 
 # Jetbrains gitignore part
 .idea
+/src/data/

@@ -1,80 +1,83 @@
-import glob
+import glob2
 
-from PySide6.QtWidgets import QFileDialog, QVBoxLayout, QScrollArea
-from PySide6.QtCore import (QMetaObject, Qt)
+from PySide6.QtWidgets import QFileDialog, QVBoxLayout, QScrollArea, QWidget
+from PySide6.QtCore import (Qt)
 from PySide6.QtGui import (QAction)
-from PySide6.QtWidgets import (QMainWindow, QToolBar, QWidget)
+from PySide6.QtWidgets import (QMainWindow, QToolBar)
 
 from GUI.widgets.spectral_view import SpectralView
 from utils.data_reading.sound_file_manager import WavFilesManager
 
-"""
-    Custom Qt Widget to display several SpectralView
-"""
-class Ui_SpectralViews(object):
-    def setupUi(self, SpectralViews):
-        if not SpectralViews.objectName():
-            SpectralViews.setObjectName(u"GUI")
+MIN_SPECTRAL_VIEW_HEIGHT = 400
+class SpectralViewsWindow(QMainWindow):
+    """ Window containing several SpectralView widgets and enabling to import them one by one or in group.
+    """
+    def __init__(self):
+        """ Constructor initializing the window and setting its visual appearance.
+        """
+        super().__init__()
+        self.setWindowTitle(u"Acoustic viewer")
 
-        SpectralViews.resize(1200, 800)
-        SpectralViews.showMaximized()
+        self.resize(1200, 800)  # size when windowed
+        self.showMaximized()  # switch to full screen
 
-        self.actionAdd_a_wav_folder = QAction(SpectralViews)
+        self.centralWidget = QWidget()
+        # add a vertical layout to contain SpectralView widgets
+        self.verticalLayout = QVBoxLayout(self.centralWidget)
+        self.centralWidget.setLayout(self.verticalLayout)
 
-        self.centralwidget = QWidget(SpectralViews)
-        self.centralwidget.setObjectName(u"centralwidget")
-        self.scroll = QScrollArea()
+        # define the central widget as a scrolling area, s.t. in case we have many spectrograms we can scroll
+        self.scroll = QScrollArea(self)
         self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.scroll.setWidgetResizable(True)
-        self.scroll.setWidget(self.centralwidget)
-        SpectralViews.setCentralWidget(self.scroll)
+        self.scroll.setWidget(self.centralWidget)
 
-        self.verticalLayout = QVBoxLayout(self.centralwidget)
-        self.verticalLayout.setObjectName(u"verticalLayout")
+        self.setCentralWidget(self.scroll)
 
-        self.toolBar = QToolBar(SpectralViews)
-        self.toolBar.setObjectName(u"toolBar")
-        SpectralViews.addToolBar(Qt.TopToolBarArea, self.toolBar)
 
+        # add a toolbar with a button to add sound folders
+        self.toolBar = QToolBar(self.centralWidget)
+        self.addToolBar(Qt.TopToolBarArea, self.toolBar)
+        self.actionAdd_a_wav_folder = QAction(self)
+        self.actionAdd_a_wav_folder_text = "Add a sound folder"
+        self.actionAdd_a_wav_folder.setText(self.actionAdd_a_wav_folder_text)
         self.toolBar.addAction(self.actionAdd_a_wav_folder)
+        self.toolBar.actionTriggered.connect(self.addDir)
 
-        self.toolBar.actionTriggered.connect(SpectralViews.addDir)
-        SpectralViews.setWindowTitle(u"Acoustic viewer")
-        self.actionAdd_a_wav_folder.setText("Add a sound folder")
-        self.toolBar.setWindowTitle(u"toolBar")
-
-        QMetaObject.connectSlotsByName(SpectralViews)
+        # list of SpectralView widgets
         self.SpectralViews = []
 
-    def addManager(self, manager):
-        new_SpectralView = SpectralView(manager, self)
-        self.verticalLayout.addWidget(new_SpectralView)
-        self.SpectralViews.append(new_SpectralView)
-
-
-class SpectralViewsWindow(QMainWindow):
-    def __init__(self):
-        super(SpectralViewsWindow, self).__init__()
-        self.ui = Ui_SpectralViews()
-        self.ui.setupUi(self)
-
-        self.wav_folders = []
-        self.managers = []
-
-    def _addDir(self, directory):
+    def _addDir(self, directory, depth=0, max_depth=3):
+        """ Given a directory, add a SpectralView if it is a sound files directory, else recursively look for sound
+        files.
+        :param directory: The directory to consider.
+        :param depth: Current depth of recursive calls in case we are in a recursive call.
+        :param max_depth: Max allowed depth of recursive calls, to avoid freezing the app.
+        :return: None.
+        """
         if directory != "":
-            files = glob.glob(directory + "/*.wav")
+            files = glob2.glob(directory + "/*.wav")
+            # check if w have a directory of .wav files
             if len(files) > 0:
-                # we have a directory of .wav files
-                self.wav_folders.append(directory)
-                self.ui.addManager(WavFilesManager(directory))
+                new_SpectralView = SpectralView(self, WavFilesManager(directory))
+                self.verticalLayout.addWidget(new_SpectralView)
+                self.SpectralViews.append(new_SpectralView)
+                for view in self.SpectralViews:
+                    view.setFixedHeight(max(self.height()*0.9//len(self.SpectralViews), MIN_SPECTRAL_VIEW_HEIGHT))
+            # else we recursively look for .wav files
             else:
-                # we found no sound file and look recursively for sound files in subfolders
-                for subdir in glob.glob(f'{directory}/**/'):
-                    self._addDir(subdir)
+                # check we didn't reach the max depth of recursive calls
+                if depth < max_depth:
+                    for subdir in glob2.glob(f'{directory}/*/'):
+                        self._addDir(subdir, depth=depth+1, max_depth=max_depth)
 
     def addDir(self, qAction):
-        if qAction.text() == u"Add a sound folder":
-            directory = QFileDialog.getExistingDirectory(self, 'directory location')
-            self._addDir(directory)
+        """ Open a files browser dialog to enable the user to add new SpectralView widgets to the window.
+        :param qAction: Action variable passed by PySide when a toolbar button is clicked.
+        :return: None.
+        """
+        # check the user clicked the add directory button
+        if qAction.text() == self.actionAdd_a_wav_folder_text:
+            directory = QFileDialog.getExistingDirectory(self, 'directory location')  # files browser
+            self._addDir(directory)  # inspection of the selected directory
