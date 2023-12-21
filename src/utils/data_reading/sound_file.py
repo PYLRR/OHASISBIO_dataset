@@ -102,6 +102,3 @@ class WavFile(SoundFile):
         :return: None.
         """
         _, self.data = scipy.io.wavfile.read(self.path)
-        if self.data.dtype == np.int16:  # 16 bits format : it has been divided by 2^14 and we thus put it back in uPa
-            self.data = self.data.astype(np.int32)
-            self.data = self.data * 2**14
