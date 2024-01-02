@@ -198,7 +198,7 @@ class SpectralView(QtWidgets.QWidget):
         aspect = ((max(t) - min(t)) / (max(f) - min(f))) * (h/w)
 
         self.mpl.axes.cla()
-        self.mpl.axes.imshow(spectro, aspect=aspect, extent=extent)
+        self.mpl.axes.imshow(spectro, aspect=aspect, extent=extent, vmin=-35, vmax=140)
         self.mpl.axes.set_xlabel('t (s)')
         self.mpl.axes.set_ylabel('f (Hz)')
 
