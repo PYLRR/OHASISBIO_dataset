@@ -170,6 +170,7 @@ class SoundFilesManager:
         :param end: End datetime of the segment.
         :return: A numpy array containing the data points in the segment.
         """
+        end -= TIMEDELTA_EPSILON  # small epsilon to exclude the last point of the interval
         first_file, last_file = self._getFilesToLoadFromSegment(start, end)
 
         file_numbers = range(first_file, last_file + 1)
