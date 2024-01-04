@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Raumer"
+  given-names: "Pierre-Yves"
+  orcid: "https://orcid.org/0009-0008-7077-0701"
+title: "A public benchmarking hydroacoustic dataset for geophonic signals detection task: code"
+doi: 10.5281/zenodo.10458857
+url: "https://github.com/PYLRR/OHASISBIO_dataset"
