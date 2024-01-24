@@ -6,7 +6,7 @@ from PySide6.QtGui import (QAction)
 from PySide6.QtWidgets import (QMainWindow, QToolBar)
 
 from GUI.widgets.spectral_view import SpectralView
-from utils.data_reading.sound_file_manager import WavFilesManager
+from utils.data_reading.sound_file_manager import WavFilesManager, make_manager
 
 MIN_SPECTRAL_VIEW_HEIGHT = 400
 class SpectralViewsWindow(QMainWindow):
@@ -57,10 +57,10 @@ class SpectralViewsWindow(QMainWindow):
         :return: None.
         """
         if directory != "":
-            files = glob2.glob(directory + "/*.wav")
+            files = glob2.glob(directory + "/*.wav") + glob2.glob(directory + "/*.dat")
             # check if w have a directory of .wav files
             if len(files) > 0:
-                new_SpectralView = SpectralView(self, WavFilesManager(directory))
+                new_SpectralView = SpectralView(self, make_manager(directory))
                 self.verticalLayout.addWidget(new_SpectralView)
                 self.SpectralViews.append(new_SpectralView)
                 for view in self.SpectralViews:

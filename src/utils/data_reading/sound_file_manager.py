@@ -6,7 +6,7 @@ from collections import deque
 
 import numpy as np
 
-from utils.data_reading.sound_file import SoundFile, WavFile
+from utils.data_reading.sound_file import SoundFile, WavFile, DatFile
 
 # epsilon to compare two close datetimes
 TIMEDELTA_EPSILON = datetime.timedelta(microseconds=10**4)
@@ -32,6 +32,9 @@ class SoundFilesManager:
         self.path = path
         # get the files in the folder
         self._initialize_files()
+
+        # decimal standard coordinates of the station in (lat, lon) format
+        self.coord = (None, None)
 
         # cache that keeps most recent files in mem, s.t. they can be used again quicker
         self.cache_size = cache_size
@@ -203,3 +206,17 @@ class WavFilesManager(SoundFilesManager):
     """ Class accounting for .wav files
     """
     FILE_CLASS = WavFile
+
+class DatFilesManager(SoundFilesManager):
+    """ Class accounting for .dat files
+    """
+    FILE_CLASS = DatFile
+
+def make_manager(path):
+    files = [file[-3:] for file in os.listdir(path)]
+    if WavFile.EXTENSION in files:
+        return WavFilesManager(path)
+    if DatFile.EXTENSION in files:
+        return DatFilesManager(path)
+    print(f"No matching manager found for path {path}")
+    return None

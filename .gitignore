@@ -2,6 +2,7 @@
 data/figures
 data/model_saves
 data/npy
+data/geo
 
 # training models checkpoints
 checkpoint*

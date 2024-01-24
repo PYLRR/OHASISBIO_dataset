@@ -102,3 +102,58 @@ class WavFile(SoundFile):
         :return: None.
         """
         _, self.data = scipy.io.wavfile.read(self.path)
+
+class DatFile(SoundFile):
+    EXTENSION = "DAT"
+    TO_VOLT = 5.0 / 2 ** 24
+    SENSIBILITY = -163.5
+
+    def _read_header(self):
+        with open(self.path, 'rb') as file:
+            file_header = file.read(400)
+
+        file_header = file_header.decode('ascii').split("\n")
+
+        self.header["site"] = file_header[3].split()[1]
+        self.header["bytes_per_sample"] = int(re.findall('(\d*)\s*[bB]', file_header[6])[0])
+        self.header["samples"] = int(int(file_header[7].split()[1]))
+        self.header["sampling_frequency"] = float(file_header[5].split()[1])
+        self._original_samples = int(file_header[7].split()[1])
+        duration_micro = 10 ** 6 * float(file_header[7].split()[1]) / float(file_header[5].split()[1])
+        self.header["duration"] = datetime.timedelta(microseconds=duration_micro)
+        date = file_header[10][18:].strip()
+
+        # we shift the starting time of 18s to go from GPS time to UTC time
+        locale.setlocale(locale.LC_TIME, "C")  # ensure we use english months names
+        if "." in date:
+            self.header["start_date"] = datetime.datetime.strptime(date, "%b %d %H:%M:%S.%f %Y") - datetime.timedelta(
+                seconds=18)
+        else:
+            # handle the case where no milisecond is present
+            self.header["start_date"] = datetime.datetime.strptime(date, "%b %d %H:%M:%S %Y") - datetime.timedelta(
+                seconds=18)
+        self.header["end_date"] = self.header["start_date"] + self.header["duration"]
+
+    def read_data(self):
+        sampsize = self.header["bytes_per_sample"]
+        with open(self.path, 'rb') as file:
+            file.seek(0)  # reset cursor pos
+            data = np.fromfile(file, dtype=np.uint8, offset=400)
+
+        data = data[:-(len(data) % sampsize)] if (len(data) % sampsize) != 0 else data
+        data = data.reshape((-1, sampsize))  # original array with custom nb of bytes
+
+        next_pow_2 = 2 ** math.ceil(math.log2(sampsize))
+
+        # prepare array of next_pow_2 bytes
+        valid_data = np.zeros((data.shape[0], next_pow_2), dtype=np.uint8)
+        neg = (data[:, 0] >= 2 ** 7)
+        # in case the nb if negative, add several 1 before
+        valid_data[:, :next_pow_2 - sampsize] = \
+            np.swapaxes(np.full((next_pow_2 - sampsize, neg.shape[0]), (2 ** 8 - 1) * neg), 0, 1)
+        valid_data[:, 1:] = data  # copy data content
+        # concatenate these bytes to form an int32
+        data = np.frombuffer(valid_data[:, ::-1].tobytes(), dtype=np.int32)
+
+        # now convert data to meaningful data
+        self.data = scipy.signal.detrend(data) * self.TO_VOLT / 10 ** (self.SENSIBILITY / 20)
