@@ -1,8 +1,7 @@
 # data
-data/figures
-data/model_saves
-data/npy
-data/geo
+data/*
+
+*.png
 
 # training models checkpoints
 checkpoint*
