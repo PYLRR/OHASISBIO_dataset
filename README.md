@@ -12,6 +12,11 @@ To run the code, please install Python 3.10.12, open a terminal at the root of t
 pip3 install -r data/requirements.txt
 ```
 
+The project dependencies and the GUI were also tested with Python 3.10.14. In case this version is required, consider running the following:
+```
+pip3 install -r data/requirements-3.10.14.txt
+```
+
 ## How to run
 ### Data
 To run the code of this project, acoustic data are necessary. Consider downloading the *OHASISBIO-2018* dataset, formatted
@@ -29,7 +34,7 @@ choosing a directory to inspect and then by exploring it with spectrograms. The 
 
 To run this software, simply open a terminal in the **src** directory and run the following:
 ```
-python3 GUI/main.py
+python3 -m GUI.main
 ```
 
 Some shortcuts are available : 
