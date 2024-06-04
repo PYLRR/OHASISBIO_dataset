@@ -96,6 +96,11 @@ class SpectralViewerWindow(QMainWindow):
         self.SpectralViews = []
 
     def _addSpectralView(self, station, date=None):
+        """ Given a station, create a spectral_view widget and add it to the window.
+        :param station: The station from which to make a spectral_view.
+        :param date: The date at which the spectral_view will be focused, if None it will be the dataset start.
+        :return: None.
+        """
         new_SpectralView = SpectralView(self, station, date=date)
         self.verticalLayout.addWidget(new_SpectralView)
         self.SpectralViews.append(new_SpectralView)
@@ -111,7 +116,7 @@ class SpectralViewerWindow(QMainWindow):
         :return: None.
         """
         if directory != "":
-            files = glob2.glob(directory + "/*.wav") + glob2.glob(directory + "/*.dat")
+            files = glob2.glob(directory + "/*.wav") + glob2.glob(directory + "/*.dat") + glob2.glob(directory + "/*.w")
             # check if we have a directory of .dat or .wav files
             if len(files) > 0:
                 station = None
@@ -138,7 +143,8 @@ class SpectralViewerWindow(QMainWindow):
         if self.broadcast_checkbox.isChecked() and 'enter' not in key.key:
             for spectral_view in self.SpectralViews:
                 spectral_view.onkeyGraph_local(key)
-        spectral_view.onkeyGraph_local(key)
+        else:
+            spectral_view.onkeyGraph_local(key)
 
     def clear_spectral_views(self):
         """ Clears the current window by removing all SpectralView widgets. Also clears top bar labels.
@@ -164,7 +170,7 @@ class SpectralViewerWindow(QMainWindow):
             self.clear_spectral_views()
         elif qAction.text() == self.action_pick_event_text:
             # open a selection dialog to choose an event to visualize
-            with open("data/events.yaml", "r") as f:
+            with open("../data/GUI/events.yaml", "r") as f:
                 events = yaml.load(f, Loader=yaml.BaseLoader)
             self.clear_spectral_views()
             to_display = list(events.keys())
@@ -177,6 +183,7 @@ class SpectralViewerWindow(QMainWindow):
             self.eventIDLabel.setText(f'Event selected: ({self.event.lat:.2f},{self.event.lon:.2f}) - {self.event.date}')
             for station, time_of_arrival in candidates:
                 self._addSpectralView(station, time_of_arrival)
+            self.broadcast_checkbox.setChecked(True)
         elif qAction.text() == self.action_locate_text:
             self.locate()
 

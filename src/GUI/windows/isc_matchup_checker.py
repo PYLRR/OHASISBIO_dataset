@@ -22,7 +22,6 @@ from utils.physics.sound_model import MonthlyGridSoundModel, HomogeneousSoundMod
 from utils.training.keras_models import TiSSNet
 
 MIN_MATCHUP_SIZE = 3
- # TODO SORT BY DISTANCE
 class ISCMatchupChecker(ISCViewer):
     def __init__(self, database_yaml, isc_file, velocity_profiles, matchups, checked_matchups, tissnet_checkpoint=None):
         with open(matchups, "rb") as f:

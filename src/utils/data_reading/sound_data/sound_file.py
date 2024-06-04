@@ -7,6 +7,9 @@ import math
 import re
 import locale
 
+from utils.transformations.signal import butter_bandpass_filter
+
+
 class SoundFile:
     """ Class representing a single sound file.
     """
@@ -94,7 +97,7 @@ class WavFile(SoundFile):
         duration_micro = 10 ** 6 * self.header["samples"] / self.header["sampling_frequency"]
         self.header["duration"] = datetime.timedelta(microseconds=duration_micro)
         file_name = self.path.split("/")[-1][:-4]  # get the name of the file and get rid of extension
-        if "_-_" in file_name: # in case the file name contains the end of the file, we remove it
+        if "_-_" in file_name:  # in case the file name contains the end of the file, we remove it
             file_name = file_name.split("-")[0][:-1]
         self.header["start_date"] = datetime.datetime.strptime(file_name, "%Y%m%d_%H%M%S")
         self.header["end_date"] = self.header["start_date"] + self.header["duration"]
@@ -165,37 +168,37 @@ class DatFile(SoundFile):
         data = np.frombuffer(valid_data[:, ::-1].tobytes(), dtype=np.int32)
 
         # now convert data to meaningful data
-        self.data = scipy.signal.detrend(data) * self.TO_VOLT / 10 ** (self.SENSIBILITY / 20)
+        data = butter_bandpass_filter(data, 1, 119, self.header["sampling_frequency"])
+        self.data = data * self.TO_VOLT / 10 ** (self.SENSIBILITY / 20)
 
 class WFile(SoundFile):
-    """ Class representing .w files specific of CTBTO. Relevant metadata are put in .wfdisc files.
+    """ Class representing a .w file specific of CTBTO.
+    Virtually, we represent 1 record (1 line of a .wfdisc) by 1 instance of this class.
     """
     EXTENSION = "w"
-    TO_VOLT = 5.0 / 2 ** 24
-    SENSIBILITY = -163.5
 
     def _read_header(self):
-        """ Read the metadata of the file using its header .wfdisc file and update self.header.
+        """ The metadata should have been passed in the path attribute, we distribute it accordingly
         :return: None.
         """
-        with open('/'.join(self.path.split("/")[:-1]) + "/wfdisc/" + self.path.split("/")[-1][:-1] + "wfdisc", "r") as f:
-            metadata = f.readlines()
-        metadata = [m.split() for m in metadata]
+        (self.path, self.header["start_date"], self.header["end_date"], self.header["start_index"],
+         self.header["end_index"], self.header["sampling_frequency"], self.header["cnt_to_upa"], self.header["site"]) \
+            = self.path
 
-        self.header["site"] = metadata[0][0]
-        self.header["start_date"] = datetime.datetime.utcfromtimestamp(float(metadata[0][2]))
-        self.header["end_date"] = datetime.datetime.utcfromtimestamp(float(metadata[-1][6]))
         self.header["duration"] = self.header["end_date"] - self.header["start_date"]
-        self.header["samples"] = np.sum([int(m[7]) for m in metadata])
-        self.header["sampling_frequency"] = self.header["samples"] / self.header["duration"].total_seconds()
 
     def read_data(self):
         """ Read the data of the file using numpy and update self.data.
         :return: None.
         """
         with open(self.path, 'rb') as file:
-            file.seek(0)  # reset cursor pos
-            data = np.fromfile(file, dtype=">i4")
+            file.seek(4*self.header["start_index"])  # reset cursor pos
+            if self.header["end_index"]:
+                 data = file.read(4*self.header["end_index"] - 4*self.header["start_index"])
+            else:
+                data = file.read()
+        data = np.frombuffer(data, dtype=">f4")
 
         # now convert data to meaningful data
-        self.data = scipy.signal.detrend(data) * self.TO_VOLT / 10 ** (self.SENSIBILITY / 20)
+        data = butter_bandpass_filter(data, 1, 119, self.header["sampling_frequency"])
+        self.data = data * self.header["cnt_to_upa"]

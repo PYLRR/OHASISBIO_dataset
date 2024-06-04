@@ -21,7 +21,7 @@ class SpectralView(QtWidgets.QWidget):
     """ Widget to explore a .wav folder by viewing spectrograms
     """
 
-    def __init__(self, SpectralViewer, station, date=None, delta_view_s=MIN_SEGMENT_DURATION_S, *args, **kwargs):
+    def __init__(self, SpectralViewer, station, date=None, delta_view_s=MIN_SEGMENT_DURATION_S*8, *args, **kwargs):
         """ Constructor initializing various parameters and setting up the interface.
         :param SpectralViewer: The parent SpectralViews window.
         :param station: A Station instance.
@@ -217,6 +217,7 @@ class SpectralView(QtWidgets.QWidget):
         start, end = self.getTimeBounds()
         # get the spectro from the extractor to be able to show it
         (f, t, spectro) = self.STFT_computer.get_features(start, end)
+
         # label the time axis from -delta to +delta
         extent = [min(t) - delta.total_seconds(), max(t) - delta.total_seconds(), min(f), max(f)]
         self.mpl.axes.cla()

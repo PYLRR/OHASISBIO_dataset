@@ -9,6 +9,7 @@ from utils.data_reading.catalogs.catalog import AcousticEvent, Emission, Catalog
 class ISC_event(AcousticEvent, Emission):
     """ This class represents events taken from the ISC catalog, providing additional specific details.
     """
+
     def __init__(self, date, lat, lon, depth, ID, author, depfix, magnitudes):
         """ Initializes the event.
         :param date: The datetime of the event happening.
@@ -33,31 +34,46 @@ class ISC_event(AcousticEvent, Emission):
 class ISC_file(CatalogFile):
     """ This class represents ISC files and enables to read and access their content.
     """
+
     def _process_file(self, path):
         """ Read the ISC ASCII file.
         :param path: Path of the ISC ASCII file.
         :return: None
         """
         with open(path, 'rb') as file:
-            lines = file.read().decode('ascii').split("\n")
+            content = file.read()
+        try:
+            lines = content.decode('ascii').split("\n")
+        except:
+            lines = content.decode('utf8').split("\n")
+
+        idx_ID, idx_auth, idx_date, idx_time, idx_lat, idx_lon, idx_depth, idx_depfix, idx_mags = tuple([None]*9)
         for line in lines:
-            if line == "" or line[0] == "#":
+            if line == "" or line[0] == "#" or line[:8] == "adminisc":
                 # we are still in the header or at the end of the file
+                # in case we reached column names line, we look for some indexes
+                if "EVENTID" in line:
+                    cols = line[1:].replace(" ", "").split(",")
+                    idx_ID, idx_auth, idx_date, idx_time, idx_lat, idx_lon, idx_depth, idx_depfix, idx_mags = (
+                        cols.index("EVENTID"), cols.index("AUTHOR"), cols.index("DATE"), cols.index("TIME"),
+                        cols.index("LAT"), cols.index("LON"), cols.index("DEPTH"), cols.index("DEPFIX"),
+                        cols.index("MAG"))
+                    idx_mags -= 2  # magnitudes are given as AUTHOR, TYPE, MAG and we want to start at AUTHOR
                 continue
             args = line.replace(" ", "").split(",")
-            ID, lat, lon = int(args[0]), float(args[4]), float(args[5])
-            author = args[1]
-            depfix = args[7] == "TRUE"
+            ID, lat, lon = int(args[idx_ID]), float(args[idx_lat]), float(args[idx_lon])
+            author = args[idx_auth]
+            depfix = args[idx_depfix] == "TRUE"
 
             # put depth to nan if we don't know it
-            depth = float("nan") if args[6] == "" or float(args[6]) == "0" else float(args[6])
+            depth = float("nan") if args[idx_depth] == "" or float(args[idx_depth]) == "0" else float(args[idx_depth])
 
             # if no decimal is given for the seconds, we add one for the parsing
-            args[3] = f"{args[3]}.0" if "." not in args[3] else args[3]
-            date = datetime.datetime.strptime(f"{args[2]}_{args[3]}", "%Y-%m-%d_%H:%M:%S.%f")
+            args[idx_time] = f"{args[idx_time]}.0" if "." not in args[idx_time] else args[idx_time]
+            date = datetime.datetime.strptime(f"{args[idx_date]}_{args[idx_time]}", "%Y-%m-%d_%H:%M:%S.%f")
 
             magnitudes = []
-            for i in range(8, len(args), 3):
+            for i in range(idx_mags, len(args), 3):
                 if args[i] == "":
                     continue
                 magnitudes.append((args[i], args[i + 1], float(args[i + 2])))

@@ -62,7 +62,7 @@ class SoundFilesManager:
 
     def _initialize_from_header(self):
         """ Get information on the dataset by reading some files of the directory.
-        :return:
+        :return: None.
         """
         # get the first and last files indexes
         self.first_file_number, self.last_file_number = self._findFirstAndLastFileNumber()
@@ -98,7 +98,7 @@ class SoundFilesManager:
     def _getPath(self, file_number):
         """ Given an index of a file, return its path.
         :param file_number: The index of the file to get.
-        :return: The path fo the file.
+        :return: The path of the file.
         """
         return self.files[file_number]
 
@@ -187,7 +187,7 @@ class SoundFilesManager:
         """ Given a start date and an end date, return an array containing all the data points between them.
         :param start: Start datetime of the segment.
         :param end: End datetime of the segment.
-        :return: A numpy array containing the data points in the segment, or None if the segment is unavailable.
+        :return: A numpy array containing the data points in the segment, where unavailable points are replaced by 0s.
         """
         end -= TIMEDELTA_EPSILON  # small epsilon to exclude the last point of the interval
         first_file, last_file = self._getFilesToLoadFromSegment(start, end)
@@ -202,7 +202,7 @@ class SoundFilesManager:
             data.extend(file_data)
             next_start = end if i == len(file_numbers) - 1 else self._loadFile(file_numbers[i+1]).header["start_date"]
             # in case the "gap" is larger than a file, we may have untouched the first file whose end may be far before
-            # the value of start. In this particular case, we have to consider only the values after start
+            # the value of start. In this case, we have to consider only the values after start and pad with 0
             previous_end = file.header["end_date"] if len(file_data) > 0 else start
             if previous_end < next_start and self.fill_empty_with_zeroes:
                 data.extend([0] * np.rint((next_start - previous_end).total_seconds() * self.sampling_f).
@@ -239,8 +239,53 @@ class DatFilesManager(SoundFilesManager):
 
 class WFilesManager(SoundFilesManager):
     """ Class accounting for .w files specific of CTBTO.
+    Virtually, we represent 1 record (1 line of .wfdisc) by 1 file.
     """
     FILE_CLASS = WFile
+
+    def _initialize_files(self):
+        """ Get the list of the virtual files (nb or records) in the directory.
+        :return: None.
+        """
+        files = glob.glob(self.path + "/wfdisc/*.wfdisc")
+        files.sort()  # we assume alphanumerically sorted files are also chronologically sorted
+        if len(files) == 0:
+            raise Exception(f"No files found in {self.path}")
+        vfiles = []
+        for file in files:
+            with open(file, "r") as f:
+                lines = f.readlines()
+            lines = [line.split() for line in lines]
+            wfile = "/".join(file.split("/")[:-2])+"/"+file.split("/")[-1][:-5]
+            paths = [wfile for _ in lines]
+            starts = [datetime.datetime.utcfromtimestamp(float(line[2])) for line in lines]
+            ends = [datetime.datetime.utcfromtimestamp(float(line[6])) for line in lines]
+            indexes_start = [int(line[17])//4 for line in lines]
+            indexes_end = indexes_start[1:] + [None]
+            sfs = [float(line[8]) for line in lines]
+            cnt_to_upa = [float(line[9]) for line in lines]
+            name = [str(line[0]) for line in lines]
+            vfiles.extend(zip(paths, starts, ends, indexes_start, indexes_end, sfs, cnt_to_upa, name))
+        self.files = vfiles
+        self.start_dates = np.array([f[1] for f in self.files])
+
+    def _getPath(self, file_number):
+        """ Given an index of a vfile, return its path.
+        :param file_number: The index of the vfile to get.
+        :return: The path of the vfile, its dates of start and end, indexes of start and end, sampling f, count to upa
+        parameter and name
+        """
+        return self.files[file_number]
+
+    def _findFirstAndLastFileNumber(self):
+        """ Find the indexes of the first and last vfiles of the dataset.
+        :return: The indexes (in the files list) of the first and last vfiles of the dataset.
+        """
+        return 0, len(self.files) - 1
+
+    def _locateFile(self, target_datetime, ref=(None, None), history=None):
+        closest = np.argmin(np.abs(target_datetime - self.start_dates))
+        return closest-1 if target_datetime < self.files[closest][1] else closest
 
 def make_manager(path):
     """ Looks for the extension of the files in the given directory and returns the correct files manager.
@@ -253,8 +298,6 @@ def make_manager(path):
     if DatFile.EXTENSION in files:
         return DatFilesManager(path)
     if WFile.EXTENSION in files:
-        if "atomic" in files:
-            return make_manager(f"{path}/atomic")
         return WFilesManager(path)
     print(f"No matching manager found for path {path}")
     return None

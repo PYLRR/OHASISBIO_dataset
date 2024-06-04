@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (QMainWindow)
 
 from GUI.widgets.spectral_view import SpectralView
 from GUI.widgets.spectral_view_tissnet import SpectralViewTissnet
+from GUI.windows.spectral_viewer import SpectralViewerWindow
 from utils.data_reading.catalogs.isc import ISC_file
 from utils.data_reading.sound_data.sound_file_manager import make_manager
 from utils.data_reading.sound_data.station import StationsCatalog
@@ -18,7 +19,7 @@ from utils.training.keras_models import TiSSNet
 
 DELTA_VIEW_S = 200
 
-class ISCViewer(QMainWindow):
+class ISCViewer(SpectralViewerWindow):
     def eventFilter(self, widget, event):
         if event.type() == QtCore.QEvent.KeyPress:
             if event.key() == QtCore.Qt.Key_Return:
@@ -31,7 +32,7 @@ class ISCViewer(QMainWindow):
         return False
 
     def __init__(self, database_yaml, isc_file, velocity_profiles, tissnet_checkpoint=None):
-        super().__init__()
+        super().__init__(database_yaml)
         self.setWindowTitle(u"T-pick")
 
         self.resize(1200, 800)  # size when windowed
@@ -47,13 +48,16 @@ class ISCViewer(QMainWindow):
         self.initialize_isc(isc_file)
 
         self.sound_model = MonthlyGridSoundModel(profiles_checkpoint=velocity_profiles,
-                                           lat_bounds=[-72, 25], lon_bounds=[0, 180])
+                                           lat_bounds=[-72, 25], lon_bounds=[0, 180], step_paths=1)
         self.sound_model = HomogeneousSoundModel()
 
         self.model = None
         if tissnet_checkpoint:
             self.model = TiSSNet()
             self.model.load_weights(tissnet_checkpoint)
+
+        self.current_ID_idx = 0
+        self.pick_current(force=True)
 
         self.pick_current()
 
@@ -108,6 +112,10 @@ class ISCViewer(QMainWindow):
         self.nextButton.setFixedHeight(40)
         self.topBarLayout.addWidget(self.nextButton)
         self.nextButton.clicked.connect(self.pick_next)
+
+        self.srcEstimateLabel = QLabel(self.centralWidget)
+        self.srcEstimateLabel.setFixedSize(750, 35)
+        self.topBarLayout.addWidget(self.srcEstimateLabel)
         self.topBarLayout.addStretch()
 
         # define the central widget as a scrolling area, s.t. in case we have many spectrograms we can scroll
@@ -125,6 +133,12 @@ class ISCViewer(QMainWindow):
 
     def initialize_isc(self, isc_file):
         self.isc = ISC_file(isc_file)
+
+        to_del = set()
+        for e in to_del:
+            del self.isc.items[e]
+
+
         self.IDs = list(self.isc.items.keys())
         self.eventIndexLabel.setText(f"/{len(self.IDs)}")
         self.current_ID_idx = 0

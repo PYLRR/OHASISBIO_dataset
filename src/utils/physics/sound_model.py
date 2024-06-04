@@ -25,7 +25,7 @@ def extrapolate_velocities_linear(depths, velocities, to_extrapolate):
 # abstract class of a SoundModel, defining what a SoundModel should do
 class SoundModel():
     # return the time, in s, that a sound emitted at one of the positions would require to reach the other one
-    def get_sound_travel_time(self, pos1, pos2):
+    def get_sound_travel_time(self, pos1, pos2, month=None):
         return None
 
     def localize_common_source(self, sensors_positions, detection_times, x_min=-np.inf, y_min=-np.inf, x_max=np.inf,
@@ -66,7 +66,7 @@ class HomogeneousSoundModel(SoundModel):
         super().__init__()
         self.sound_speed = sound_speed
 
-    def get_sound_travel_time(self, pos1, pos2):
+    def get_sound_travel_time(self, pos1, pos2, month=None):
         distance = geopy.distance.geodesic(pos1[:2], pos2[:2]).m
         return distance / self.sound_speed
 
@@ -121,6 +121,9 @@ class MonthlyGridSoundModel(SoundModel):
                                                  extrapolate_velocities_linear(depths, self.velocities[m],
                                                                         depths_to_extrapolate)))
 
+            mask = np.isnan(self.velocities[m])
+            self.velocities[m][mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask), self.velocities[m][~mask])
+
     def save_profiles(self, path):
         with open(path, 'wb') as f:
             pickle.dump((self.velocities, self.depths, self.lat, self.lon), f)
@@ -142,7 +145,11 @@ class MonthlyGridSoundModel(SoundModel):
         not_nans = ~nans
         velocities[nans] = np.mean(velocities[not_nans], axis=0)
 
-        return deg_to_m(self.step_paths) * np.sum(1 / np.min(velocities, axis=1))
+        vel = []
+        for v in velocities:
+            vel.append(0.995*np.mean(v[v<=(v[0]+0.5*(np.min(v)-v[0]))]))
+
+        return deg_to_m(self.step_paths) * np.sum(1 / np.array(vel))
 
     def get_sound_travel_time_bellhop(self, pos1, pos2, month=0):
         env = self.get_env(pos1, pos2, month)
@@ -160,10 +167,10 @@ class MonthlyGridSoundModel(SoundModel):
         duplicated_velocities = np.concatenate((velocities, velocities))
         df = pd.DataFrame({deg_to_m(i * self.step_paths): v for i, v in enumerate(duplicated_velocities)}, index=self.depths)
         env = pm.create_env2d(depth=self.depths[-1], soundspeed=df)
-        env["rx_depth"] = 1100
-        env["rx_range"] = deg_to_m(self.step_paths * (len(velocities)-1))
-        env["tx_depth"] = 1100
-        env["frequency"] = 40
+        env["rx_depth"] = self.depths[np.argmin(velocities[-1])]
+        env["rx_range"] = geopy.distance.geodesic(pos1[:2], pos2[:2]).m
+        env["tx_depth"] = self.depths[np.argmin(velocities[0])]
+        env["frequency"] = 20
         env['min_angle'] = -5
         env['max_angle'] = 5
         return env

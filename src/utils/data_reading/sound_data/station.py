@@ -50,11 +50,14 @@ class Station:
         return Station(self.path, self.name, self.lat, self.lon, self.date_start, self.date_end, self.dataset)
 
     def __str__(self):
-        return f"station {self.name}"
+        return f"station_{self.name}_{self.date_start.year}"
 
     def __eq__(self, other):
         return (self.name == other.name and self.lat == other.lat and self.lon == other.lon and
                 self.date_start == other.date_start and self.date_end == other.date_end)
+
+    def __hash__(self):
+        return hash((self.name, self.lat, self.lon, self.date_start, self.date_end))
 
 class StationsCatalog():
     def __init__(self, yaml_file=None):
@@ -69,6 +72,8 @@ class StationsCatalog():
 
         for dataset, dataset_yaml in data.items():
             path = dataset_yaml["root_dir"]
+            if path == "":
+                continue
             for station_name, station_yaml in dataset_yaml["stations"].items():
                 date_start, date_end, lat, lon = None, None, None, None
                 if station_yaml["date_start"].strip() != "":
@@ -139,7 +144,7 @@ class StationsCatalog():
         times_of_prop = []
         delta = delta or datetime.timedelta(seconds=0)
         for st in self.stations:
-            time_of_prop = sound_model.get_sound_travel_time(event.get_pos(), st.get_pos())
+            time_of_prop = sound_model.get_sound_travel_time(event.get_pos(), st.get_pos(), month=event.date.month)
             if not time_of_prop:
                 continue
             time_of_arrival = event.date + datetime.timedelta(seconds=time_of_prop)
