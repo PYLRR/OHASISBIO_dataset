@@ -1,12 +1,10 @@
 import datetime
-import re
 
-import numpy as np
-
-from utils.data_reading.catalogs.catalog import AcousticEvent, Emission, CatalogFile
+from utils.data_reading.catalogs.catalog import CatalogFile
+from utils.data_reading.catalogs.events import Event, Emission
 
 
-class ISC_event(AcousticEvent, Emission):
+class ISC_event(Event, Emission):
     """ This class represents events taken from the ISC catalog, providing additional specific details.
     """
 

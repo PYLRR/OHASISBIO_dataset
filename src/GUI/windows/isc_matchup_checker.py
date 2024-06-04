@@ -19,7 +19,7 @@ from utils.data_reading.catalogs.matchup_catalog import AcousticDetection, Match
 from utils.data_reading.sound_data.sound_file_manager import make_manager
 from utils.data_reading.sound_data.station import StationsCatalog
 from utils.physics.sound_model import MonthlyGridSoundModel, HomogeneousSoundModel
-from utils.training.keras_models import TiSSNet
+from utils.training.TiSSNet import TiSSNet
 
 MIN_MATCHUP_SIZE = 3
 class ISCMatchupChecker(ISCViewer):

@@ -17,7 +17,7 @@ from utils.data_reading.catalogs.isc import ISC_file
 from utils.data_reading.sound_data.station import StationsCatalog
 from utils.physics.bathymetry_model import BathymetryModel
 from utils.physics.sound_model import MonthlyGridSoundModel, HomogeneousSoundModel
-from utils.training.keras_models import TiSSNet
+from utils.training.TiSSNet import TiSSNet
 from utils.transformations.features_extractor import STFTFeaturesExtractor
 
 def apply_TiSSNet(batch, model):
