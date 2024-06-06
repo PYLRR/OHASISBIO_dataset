@@ -15,9 +15,19 @@ class MainMenuWindow(QMainWindow):
         self.centralWidget = QWidget()
         self.setCentralWidget(self.centralWidget)
         self.verticalLayout = QVBoxLayout(self.centralWidget)
-        for choice_name, choice_function in menu_choices:
+        for choice_name, window in menu_choices:
             button = QPushButton(self.centralWidget)
             button.setText(choice_name)
             button.setFixedHeight(40)
             self.verticalLayout.addWidget(button)
-            button.clicked.connect(choice_function)
+            button.clicked.connect(self.display_window(window))
+
+    def display_window(self, window):
+        """ Method to open a window and record it as an attribute.
+        :param window: Window to open.
+        :return: A function that opens the window.
+        """
+        def f():
+            self.window = window()
+            self.window.show()
+        return f

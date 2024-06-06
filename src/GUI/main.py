@@ -20,7 +20,7 @@ if __name__ == "__main__":
     tissnet_checkpoint = "../data/model_saves/TiSSNet/all/cp-0022.ckpt"
 
     # Menu choices
-    menu_choices = [("Spectral Viewer", lambda: SpectralViewerWindow(datasets_yaml)),
+    menu_choices = [("Spectral Viewer", lambda: SpectralViewerWindow(datasets_yaml, tissnet_checkpoint=tissnet_checkpoint)),
                     ("ISC Viewer", lambda: CatalogViewer(datasets_yaml, ISC_file(isc_file), tissnet_checkpoint=tissnet_checkpoint)),
                     ("Ross Viewer", lambda: CatalogViewer(datasets_yaml, Ross_file(ross_file), tissnet_checkpoint=tissnet_checkpoint))]
 

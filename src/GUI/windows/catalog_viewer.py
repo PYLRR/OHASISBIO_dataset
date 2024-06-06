@@ -17,7 +17,6 @@ from utils.data_reading.sound_data.station import StationsCatalog
 from utils.physics.sound_model import MonthlyGridSoundModel, HomogeneousSoundModel
 from utils.training.TiSSNet import TiSSNet
 
-DELTA_VIEW_S = 200
 
 class CatalogViewer(SpectralViewerWindow):
     """ Class to inspect a catalog of events.
@@ -47,7 +46,7 @@ class CatalogViewer(SpectralViewerWindow):
         model is used.
         :param tissnet_checkpoint: Checkpoint of TiSSNet model in case we want to try detections.
         """
-        super().__init__(database_yaml)
+        super().__init__(database_yaml, tissnet_checkpoint)
         self.setWindowTitle(u"Catalog viewer")
 
         self.resize(1200, 800)  # size when windowed
@@ -73,12 +72,6 @@ class CatalogViewer(SpectralViewerWindow):
                                                lat_bounds=[-72, 25], lon_bounds=[0, 180], step_paths=1)
         else:
             self.sound_model = HomogeneousSoundModel()
-
-        # TiSSNet
-        self.model = None
-        if tissnet_checkpoint:
-            self.model = TiSSNet()
-            self.model.load_weights(tissnet_checkpoint)
 
         self.pick_current()
 
@@ -155,17 +148,6 @@ class CatalogViewer(SpectralViewerWindow):
         self.scrollVerticalLayout = QVBoxLayout()
         self.verticalLayout.addLayout(self.scrollVerticalLayout)
 
-    def add_spectral_view(self, station, date):
-        """ Add a spectral view to the list.
-        :param station: Station we want to use.
-        :param date: Date on which to center the view.
-        :return: None.
-        """
-        station.load_data()
-        new_SpectralView = SpectralViewTissnet(self, station, date=date, delta_view_s=DELTA_VIEW_S)
-        self.scrollVerticalLayout.addWidget(new_SpectralView)
-        self.SpectralViews.append(new_SpectralView)
-
     def clear_spectral_views(self):
         """ Clear the spectral views window and the internal list of them.
         :return: None.
@@ -229,4 +211,4 @@ class CatalogViewer(SpectralViewerWindow):
         self.eventIDLabel.setText(f'({event.lat:.2f},{event.lon:.2f}) - {event.date}')
         self.clear_spectral_views()
         for station, time_of_arrival in candidates:
-            self.add_spectral_view(station, time_of_arrival)
+            self._add_spectral_view(station, time_of_arrival)

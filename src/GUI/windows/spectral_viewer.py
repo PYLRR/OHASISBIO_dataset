@@ -11,16 +11,21 @@ from PySide6.QtGui import (QAction)
 from PySide6.QtWidgets import (QMainWindow, QToolBar)
 
 from GUI.widgets.spectral_view import SpectralView, QdatetimeToDatetime
+from GUI.widgets.spectral_view_tissnet import SpectralViewTissnet
+from utils.data_reading.catalogs.events import AcousticEmission
 from utils.data_reading.sound_data.station import Station, StationsCatalog
 from utils.physics.sound_model import HomogeneousSoundModel
+from utils.training.TiSSNet import TiSSNet
 
 MIN_SPECTRAL_VIEW_HEIGHT = 400
+DELTA_VIEW_S = 200
 class SpectralViewerWindow(QMainWindow):
     """ Window containing several SpectralView widgets and enabling to import them one by one or in group.
     """
-    def __init__(self, database_yaml):
+    def __init__(self, database_yaml, tissnet_checkpoint=None):
         """ Constructor initializing the window and setting its visual appearance.
         :param database_yaml: YAML file containing information about the available stations.
+        :param tissnet_checkpoint: Checkpoint of TiSSNet model in case we want to try detections.
         """
         super().__init__()
         self.sound_model = HomogeneousSoundModel()
@@ -43,7 +48,7 @@ class SpectralViewerWindow(QMainWindow):
         self.eventIDLabel.setFixedSize(750, 35)
         self.topBarLayout.addWidget(self.eventIDLabel)
         self.srcEstimateLabel = QLabel(self.centralWidget)
-        self.srcEstimateLabel.setFixedSize(750, 35)
+        self.srcEstimateLabel.setFixedSize(950, 35)
         self.topBarLayout.addWidget(self.srcEstimateLabel)
         self.topBarLayout.addStretch()
 
@@ -94,13 +99,20 @@ class SpectralViewerWindow(QMainWindow):
         # list of SpectralView widgets
         self.SpectralViews = []
 
-    def _addSpectralView(self, station, date=None):
+        # TiSSNet
+        self.model = None
+        if tissnet_checkpoint:
+            self.model = TiSSNet()
+            self.model.load_weights(tissnet_checkpoint)
+
+    def _add_spectral_view(self, station, date=None):
         """ Given a station, create a spectral_view widget and add it to the window.
         :param station: The station from which to make a spectral_view.
         :param date: The date at which the spectral_view will be focused, if None it will be the dataset start.
         :return: None.
         """
-        new_SpectralView = SpectralView(self, station, date=date)
+        sv = SpectralView if self.model is None else SpectralViewTissnet
+        new_SpectralView = sv(self, station, date=date, delta_view_s=DELTA_VIEW_S)
         self.verticalLayout.addWidget(new_SpectralView)
         self.SpectralViews.append(new_SpectralView)
         for view in self.SpectralViews:  # resize other spectral views if needed
@@ -124,7 +136,7 @@ class SpectralViewerWindow(QMainWindow):
                     if st.path in directory:
                         station = st
                 station = station or Station(directory, initialize_metadata=True)
-                self._addSpectralView(station)
+                self._add_spectral_view(station)
             # else we recursively look for .dat or .wav files
             else:
                 # check we didn't reach the max depth of recursive calls
@@ -177,11 +189,11 @@ class SpectralViewerWindow(QMainWindow):
             date, lat, lon = events[choice[0]]["datetime"], events[choice[0]]["lat"], events[choice[0]]["lon"]
             lat, lon = float(lat), float(lon)
             date = datetime.datetime.strptime(date, "%Y%m%d_%H%M%S")
-            self.event = AcousticSource(date, lat, lon)
+            self.event = AcousticEmission(date, lat, lon)
             candidates = self.stations.by_date_propagation(self.event, self.sound_model)
             self.eventIDLabel.setText(f'Event selected: ({self.event.lat:.2f},{self.event.lon:.2f}) - {self.event.date}')
             for station, time_of_arrival in candidates:
-                self._addSpectralView(station, time_of_arrival)
+                self._add_spectral_view(station, time_of_arrival)
             self.broadcast_checkbox.setChecked(True)
         elif qAction.text() == self.action_locate_text:
             self.locate()
