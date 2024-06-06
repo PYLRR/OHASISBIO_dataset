@@ -1,12 +1,11 @@
-import datetime
 import sys
+from PySide6.QtWidgets import QApplication
 
-from PySide6.QtWidgets import (QApplication)
-
-from GUI.windows.isc_matchup_checker import ISCMatchupChecker
-from GUI.windows.isc_viewer import ISCViewer
+from GUI.windows.catalog_viewer import CatalogViewer
+from GUI.windows.main_menu import MainMenuWindow
 from GUI.windows.spectral_viewer import SpectralViewerWindow
-from utils.data_reading.catalogs.matchup_catalog import AcousticSource
+from utils.data_reading.catalogs.isc import ISC_file
+from utils.data_reading.catalogs.ross import Ross_file
 
 if __name__ == "__main__":
     # main to call in order to launch the dataset exploration tool.
@@ -17,12 +16,16 @@ if __name__ == "__main__":
 
     datasets_yaml = "/home/plerolland/Bureau/dataset.yaml"
     isc_file = "/home/plerolland/Bureau/catalogs/ISC/eqk_isc_2017.txt"
-    velocities_file = "../data/geo/velocities_grid.pkl"
+    ross_file = "/home/plerolland/Téléchargements/temp/EA_CTBTO_catalog_all.dat"
     tissnet_checkpoint = "../data/model_saves/TiSSNet/all/cp-0022.ckpt"
-    matchups = "../data/T-pick/2018/matchups_isc_2018"
-    #window = SpectralViewerWindow(datasets_yaml)
-    window = ISCViewer(datasets_yaml, isc_file, velocities_file, tissnet_checkpoint)
-    #window = ISCMatchupChecker(datasets_yaml, isc_file, velocities_file, matchups, checked_matchups, tissnet_checkpoint)
+
+    # Menu choices
+    menu_choices = [("Spectral Viewer", lambda: SpectralViewerWindow(datasets_yaml)),
+                    ("ISC Viewer", lambda: CatalogViewer(datasets_yaml, ISC_file(isc_file), tissnet_checkpoint=tissnet_checkpoint)),
+                    ("Ross Viewer", lambda: CatalogViewer(datasets_yaml, Ross_file(ross_file), tissnet_checkpoint=tissnet_checkpoint))]
+
+    window = MainMenuWindow(menu_choices)
     window.show()
 
     sys.exit(app.exec())
+

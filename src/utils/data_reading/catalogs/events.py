@@ -54,15 +54,7 @@ class AcousticEvent(Event):
         super().__init__(date, lat, lon, depth)
         self.level = level
 
-class Emission():
-    """ This class represents an emission. """
-    pass
-
-class Reception():
-    """ This class represents a reception. """
-    pass
-
-class AcousticEmission(AcousticEvent, Emission):
+class AcousticEmission(AcousticEvent):
     """ This class represents generic acoustic source event. """
     def __init__(self, date, lat=None, lon=None, source_level=None):
         """ Initializes the event.
@@ -74,7 +66,7 @@ class AcousticEmission(AcousticEvent, Emission):
         super().__init__(date, lat, lon)
         self.source_level = source_level
 
-class AcousticReception(AcousticEvent, Reception):
+class AcousticReception(AcousticEvent):
     """ This class represents generic acoustic reception events."""
     def __init__(self, station, date, received_level=None):
         """ Initializes the event.

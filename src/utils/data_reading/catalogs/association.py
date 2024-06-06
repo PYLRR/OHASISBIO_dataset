@@ -30,9 +30,9 @@ class Association:
         :param initial_pos: The initial position of the location as a 2D list or numpy array in format (lat, lon).
         :return: The result of the location attempt.
         """
-        sensors_positions = np.array([d.station.get_pos() for d in self.event])
-        detection_times = np.array([d.date for d in self.event])
-        return sound_model.LocalizeCommonSource(sensors_positions, detection_times, initial_pos=initial_pos)
+        sensors_positions = np.array([d.station.get_pos() for d in self.events])
+        detection_times = np.array([d.date for d in self.events])
+        return sound_model.localize_common_source(sensors_positions, detection_times, initial_pos=initial_pos)
 
     def __iter__(self):
         """ __iter__ definition to allow to iterate threw this class.
@@ -47,6 +47,7 @@ class Association:
         self.idx += 1
         if self.idx < len(self.events):
             return self.events[self.idx]
+        self.idx = - 1
         raise StopIteration
 
     def __getitem__(self, idx):

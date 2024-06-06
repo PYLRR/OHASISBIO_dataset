@@ -11,7 +11,6 @@ from PySide6.QtGui import (QAction)
 from PySide6.QtWidgets import (QMainWindow, QToolBar)
 
 from GUI.widgets.spectral_view import SpectralView, QdatetimeToDatetime
-from utils.data_reading.catalogs.matchup_catalog import AcousticSource
 from utils.data_reading.sound_data.station import Station, StationsCatalog
 from utils.physics.sound_model import HomogeneousSoundModel
 

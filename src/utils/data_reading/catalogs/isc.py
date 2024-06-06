@@ -1,10 +1,12 @@
 import datetime
 
+import numpy as np
+
 from utils.data_reading.catalogs.catalog import CatalogFile
-from utils.data_reading.catalogs.events import Event, Emission
+from utils.data_reading.catalogs.events import Event
 
 
-class ISC_event(Event, Emission):
+class ISC_event(Event):
     """ This class represents events taken from the ISC catalog, providing additional specific details.
     """
 
@@ -17,10 +19,22 @@ class ISC_event(Event, Emission):
         :param ID: The ISC ID of the event.
         :param author: The author of the event discovery.
         :param depfix: Indicates whether a depfix has been performed or not.
-        :param magnitudes: Gives a list of all computed magnitudes in the shape (author, type, value)
+        :param magnitudes: List of all computed magnitudes in the shape (author, type, value).
         """
         super().__init__(date, lat, lon, depth)
         self.ID, self.author, self.depfix, self.magnitudes = ID, author, depfix, magnitudes
+
+    def get_magnitude(self, wanted_mag):
+        """ Returns the magnitude of the given magnitude type.
+        :param wanted_mag: Wanted magnitude (such as "mb", "mw"...).
+        :return: An array of the wanted magnitudes, possibly empty.
+        """
+        wanted_mag = np.char.lower(wanted_mag)
+        available_mags = np.array(self.magnitudes)
+        if len(available_mags) > 0 and np.any(wanted_mag == np.char.lower(np.array(available_mags)[:, 1])):
+            mag = available_mags[np.char.lower(available_mags[:, 1]) == wanted_mag]
+            return mag[:, 2].astype(np.float32)
+        return []
 
     def __str__(self):
         """ Outputs a simple description of the event, specifying the event is from ISC.

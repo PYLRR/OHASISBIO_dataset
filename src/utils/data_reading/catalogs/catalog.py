@@ -62,6 +62,7 @@ class Catalog:
         self.idx += 1
         if self.idx < len((l := list(self.items.items()))):
             return l[self.idx]
+        self.idx = - 1
         raise StopIteration
 
 class CatalogFile(Catalog):
