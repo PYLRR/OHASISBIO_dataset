@@ -20,10 +20,12 @@ from utils.physics.sound_model import MonthlyGridSoundModel, HomogeneousSoundMod
 from utils.training.TiSSNet import TiSSNet
 from utils.transformations.features_extractor import STFTFeaturesExtractor
 
+@profile
 def apply_TiSSNet(batch, model):
     stft = tf.convert_to_tensor(batch, dtype=tf.uint8)
     return model.predict(stft, verbose=True, batch_size=32)
 
+@profile
 def apply_sta_lta(manager, time, delta, sta_delta, sf_to_mimic=240):
     sta_offset = int(sta_delta.total_seconds() * 2 * manager.sampling_f)
     pts_sta = manager.getSegment(time - delta - sta_delta, time + delta + sta_delta)
@@ -55,7 +57,7 @@ def compute_peaks(time_series, station, time, global_welch, min_height, distance
 if __name__=="__main__":
     @profile
     def main():
-        for year in [2018]:
+        for year in [2020]:
             print(f"STARTING {year} at {datetime.datetime.now()}")
             # input files
             datasets_yaml = "/home/plerolland/Bureau/dataset.yaml"
@@ -128,6 +130,7 @@ if __name__=="__main__":
                     batch_meta.append(to_process[idx])
                     idx += 1
                     manager = station.get_manager()
+                    manager.cache_size = 0
 
                     stft_computer.manager = manager
                     data = manager.getSegment(time - DELTA, time + DELTA)

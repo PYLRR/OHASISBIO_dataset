@@ -5,6 +5,8 @@ import os
 from collections import deque
 
 import numpy as np
+import scipy
+from tqdm import tqdm
 
 from utils.data_reading.sound_data.sound_file import SoundFile, WavFile, DatFile, WFile
 
@@ -220,6 +222,24 @@ class SoundFilesManager:
         :return: None.
         """
         self.cache.clear()
+
+    def toWav(self, start, end, file_duration, path):
+        """ Load the required segment and save it as a wav file.
+        :param start: Start of the segment to save. Start of the dataset if None.
+        :param end: End of the segment to save. End of the dataset if None.
+        :param file_duration: Duration, as a datetime.timedelta, of a single file.
+        :param path: Path of the directory where to save the wav file.
+        :return: None
+        """
+        start, end = start or self.dataset_start, end or self.dataset_end
+        for i in tqdm(range(math.ceil((end-start)/file_duration)), desc="Converting dataset"):
+            seg_start = start + i*file_duration
+            seg_end = min(seg_start + file_duration, end)
+
+            data = np.array(self.getSegment(seg_start, seg_end), dtype=np.int32)
+            scipy.io.wavfile.write(f'{path}/{seg_start.strftime("%Y%m%d_%H%M%S")}.wav',
+                                   int(self.sampling_f), data)
+
 
     def __eq__(self, other):
         """ Test if another manager works with the same path.
