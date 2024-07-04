@@ -248,7 +248,6 @@ class SpectralView(QtWidgets.QWidget):
                                                  self.segment_date_dateTimeEdit.time())
             segment_center += datetime.timedelta(seconds=click.xdata)  # move to the click location
             self.segment_date_dateTimeEdit.setDateTime(DatetimeToQdatetime(segment_center))
-            self.updatePlot()  # update the spectrogram and plot it
 
     def onkeyGraph(self, key):
         """ Handles key press operations by passing the event to the parent spectral_viewer.
@@ -269,16 +268,16 @@ class SpectralView(QtWidgets.QWidget):
         if key.key == 'right':
             # go to right
             segment_center += delta
-        if key.key == 'left':
+        elif key.key == 'left':
             # go to left
             segment_center -= delta
-        if key.key == '+':
+        elif key.key == '+':
             # zoom
             delta /= 2
-        if key.key == '-':
+        elif key.key == '-':
             # dezoom
             delta *= 2
-        if key.key == 'enter':
+        elif key.key == 'enter':
             # play the sound with 20 times increased frequency
             data = self.manager.getSegment(segment_center - delta, segment_center + delta)
             data = data / np.max(np.abs(data))
@@ -289,29 +288,26 @@ class SpectralView(QtWidgets.QWidget):
             playsound("./temp_audio.wav")
             # delete the temporary file
 
-        if key.key == "up":
+        elif key.key == "up":
             # increase min and max allowed frequency, respecting the limit of the Nyquist-Shannon frequency
             d = min(self.manager.sampling_f / 2 - self.freq_range[1],
                     0.1 * self.manager.sampling_f / 2)
             self.freq_range[0] += d
             self.freq_range[1] += d
-            self.updatePlot()
 
-        if key.key == "down":
+        elif key.key == "down":
             # decrase min and max allowed frequency, respecting the limit of 0
             d = min(self.freq_range[0],
                     0.1 * self.manager.sampling_f / 2)
             self.freq_range[0] -= d
             self.freq_range[1] -= d
-            self.updatePlot()
 
-        if key.key == "*":
+        elif key.key == "*":
             # decrease the maximal allowed frequency
             d = 0.05 * (self.freq_range[1] - self.freq_range[0])
             self.freq_range[1] -= d
-            self.updatePlot()
 
-        if key.key == "/":
+        elif key.key == "/":
             # increase the minimal and maximal allowed frequency, respecting the limit of 0 and the
             # Nyquist-Shannon frequency
             delta_top = min(0.05 * (self.freq_range[1] - self.freq_range[0]),
@@ -320,9 +316,8 @@ class SpectralView(QtWidgets.QWidget):
                             self.freq_range[0])
             self.freq_range[0] -= delta_bot
             self.freq_range[1] += delta_top
-            self.updatePlot()
 
-        if key.key == "shift+enter":
+        elif key.key == "shift+enter":
             # put all the SpectralView widgets of the parent window to the same configuration
             segment_center = QdatetimeToDatetime(self.segment_date_dateTimeEdit.date(),
                                                  self.segment_date_dateTimeEdit.time())
@@ -330,6 +325,8 @@ class SpectralView(QtWidgets.QWidget):
                 spectralview.freq_range = self.freq_range.copy()
                 spectralview.changeDate(segment_center)
                 spectralview.changeSegmentLength(self.segment_length_doubleSpinBox.value())
+        else:
+            return
 
         # update widgets
         self.segment_date_dateTimeEdit.setDateTime(DatetimeToQdatetime(segment_center))

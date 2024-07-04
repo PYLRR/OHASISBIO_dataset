@@ -6,6 +6,7 @@ import numpy as np
 import math
 import re
 import locale
+import soundfile as sf
 
 from utils.transformations.signal import butter_bandpass_filter
 
@@ -41,7 +42,38 @@ class SoundFile:
         but without reading its data, it may be necessary to ask to read the data.
         :return: None.
         """
-        pass  # abstract method
+        self.data = self.read_data_subpart(None, None)
+
+    def read_data_subpart(self, offset_points_start, points_to_keep):
+        """ Read the specified part of the data of the file and return it.
+        :param offset_points_start: Number of points to skip before the data part to keep. None if from the start.
+        :param points_to_keep: Number of points to keep. None in case we keep everything after the start.
+        :return: The required data.
+        """
+        if len(self.data) > 0:
+            return self._read_data_subpart_cached(offset_points_start, points_to_keep)
+        return self._read_data_subpart_uncached(offset_points_start, points_to_keep)
+
+    def _read_data_subpart_uncached(self, offset_points_start, points_to_keep):
+        """ Read the specified part of the data from yet uncached file data and return it.
+        :param offset_points_start: Number of points to skip before the data part to keep. None if from the start.
+        :param points_to_keep: Number of points to keep. None in case we keep everything after the start.
+        :return: The required data.
+        """
+        return None  # abstract method
+
+    def _read_data_subpart_cached(self, offset_points_start, points_to_keep):
+        """ Read the specified part of the data from cached file data and return it.
+        :param offset_points_start: Number of points to skip before the data part to keep. None if from the start.
+        :param points_to_keep: Number of points to keep. None in case we keep everything after the start.
+        :return: The required data.
+        """
+        data = self.data
+        if offset_points_start is not None:
+            data = data[offset_points_start:]
+        if points_to_keep is not None:
+            data = data[:points_to_keep]
+        return data
 
     def get_data(self, start=None, end=None):
         """ Given a start datetime and an end datetime, read the data. In case the bounds are outside of the file, the
@@ -50,23 +82,23 @@ class SoundFile:
         :param end: End datetime of the segment.
         :return: The required data.
         """
-        data = self.data
         if start is not None and end is not None:
             assert end > start, "required end is before or equal to the start"
+        offset_points_start, points_to_keep = None, None
 
         if start is not None:
             # select the data starting after start
-            offset = start - self.header["start_date"]
-            offset_points = int(offset.total_seconds() * self.header["sampling_frequency"])
-            if offset_points > 0:
-                data = data[offset_points:]
+            offset_start = start - self.header["start_date"]
+            offset_points_start = int(offset_start.total_seconds() * self.header["sampling_frequency"])
+            offset_points_start = None if offset_points_start < 0 else offset_points_start
 
         if end is not None:
             # select the data ending before end
-            offset = self.header["end_date"] - end
-            offset_points = int(offset.total_seconds() * self.header["sampling_frequency"])
-            if offset_points > 0:
-                data = data[:-offset_points]
+            keep = end - (max(start, self.header["start_date"]) if start else self.header["start_date"])
+            points_to_keep = int(keep.total_seconds() * self.header["sampling_frequency"])
+            points_to_keep = None if points_to_keep > self.header["samples"] else points_to_keep
+
+        data = self.read_data_subpart(offset_points_start, points_to_keep)
         return data
 
     def __eq__(self, other):
@@ -102,11 +134,17 @@ class WavFile(SoundFile):
         self.header["start_date"] = datetime.datetime.strptime(file_name, "%Y%m%d_%H%M%S")
         self.header["end_date"] = self.header["start_date"] + self.header["duration"]
 
-    def read_data(self):
-        """ Read the data of the file using scipy and update self.data.
-        :return: None.
+    def _read_data_subpart_uncached(self, offset_points_start, points_to_keep):
+        """ Read and return the required data.
+        :param offset_points_start: Number of points to skip before the data part to keep. None if from the start.
+        :param points_to_keep: Number of points to keep. None in case we keep everything after the start.
+        :return: The required data.
         """
-        _, self.data = scipy.io.wavfile.read(self.path)
+        file = sf.SoundFile(self.path)
+        file.seek(offset_points_start if offset_points_start else 0)
+        data = file.read(points_to_keep if points_to_keep else -1, dtype='int32')
+        return data
+
 
 class DatFile(SoundFile):
     """ Class representing .dat files specific of GEO-OCEAN lab. Relevant metadata are in the files headers.
@@ -143,24 +181,27 @@ class DatFile(SoundFile):
             self.header["start_date"] = datetime.datetime.strptime(date, "%b %d %H:%M:%S %Y") - datetime.timedelta(seconds=18)
         self.header["end_date"] = self.header["start_date"] + self.header["duration"]
 
-    def read_data(self):
-        """ Read the data of the file using numpy, put it from 24 to 32 bits and update self.data.
-        :return: None.
+    def _read_data_subpart_uncached(self, offset_points_start, points_to_keep):
+        """ Read the specified data of the file using numpy, put it from 24 to 32 bits.
+        :param offset_points_start: Number of points to skip before the data part to keep. None if from the start.
+        :param points_to_keep: Number of points to keep. None in case we keep everything after the start.
+        :return: The required data.
         """
         sampsize = self.header["bytes_per_sample"]
         with open(self.path, 'rb') as file:
-            file.seek(0)  # reset cursor pos
-            data = np.fromfile(file, dtype=np.uint8, offset=400)
+            data = np.fromfile(file, dtype=np.uint8,
+                               offset=400 + ((sampsize * offset_points_start) if offset_points_start else 0),
+                               count=(sampsize * points_to_keep) if points_to_keep else -1)
 
         data = data[:-(len(data) % sampsize)] if (len(data) % sampsize) != 0 else data
         data = data.reshape((-1, sampsize))  # original array with custom nb of bytes
 
-        next_pow_2 = 2 ** math.ceil(math.log2(sampsize))
+        next_pow_2 = 2 ** math.ceil(math.log2(sampsize))  # size at which the data will be stored
 
         # prepare array of next_pow_2 bytes
         valid_data = np.zeros((data.shape[0], next_pow_2), dtype=np.uint8)
         neg = (data[:, 0] >= 2 ** 7)
-        # in case the nb if negative, add several 1 before
+        # in case the nb if negative, add several 1 before, else 0 (see ISO signed integer representation)
         valid_data[:, :next_pow_2 - sampsize] = \
             np.swapaxes(np.full((next_pow_2 - sampsize, neg.shape[0]), (2 ** 8 - 1) * neg), 0, 1)
         valid_data[:, 1:] = data  # copy data content
@@ -169,10 +210,11 @@ class DatFile(SoundFile):
 
         # now convert data to meaningful data
         data = butter_bandpass_filter(data, 1, 119, self.header["sampling_frequency"])
-        self.data = data * self.TO_VOLT / 10 ** (self.SENSIBILITY / 20)
+        data = data * self.TO_VOLT / 10 ** (self.SENSIBILITY / 20)
+        return data
 
 class WFile(SoundFile):
-    """ Class representing a .w file specific of CTBTO.
+    """ Class representing a record from a .w file specific of CTBTO's IMS.
     Virtually, we represent 1 record (1 line of a .wfdisc) by 1 instance of this class.
     """
     EXTENSION = "w"
@@ -184,21 +226,32 @@ class WFile(SoundFile):
         (self.path, self.header["start_date"], self.header["end_date"], self.header["start_index"],
          self.header["end_index"], self.header["sampling_frequency"], self.header["cnt_to_upa"], self.header["site"]) \
             = self.path
-
+        self.header["bytes_per_sample"] = 4  # fix value
         self.header["duration"] = self.header["end_date"] - self.header["start_date"]
+        self.header["samples"] = int(self.header["duration"].total_seconds() * self.header["sampling_frequency"])
 
-    def read_data(self):
-        """ Read the data of the file using numpy and update self.data.
-        :return: None.
+    def _read_data_subpart_uncached(self, offset_points_start, points_to_keep):
+        """ Read the specified data of the file using numpy.
+        :param offset_points_start: Number of points to skip before the data part to keep. None if from the start.
+        :param points_to_keep: Number of points to keep. None in case we keep everything after the start.
+        :return: The required data.
         """
-        with open(self.path, 'rb') as file:
-            file.seek(4*self.header["start_index"])  # reset cursor pos
-            if self.header["end_index"]:
-                 data = file.read(4*self.header["end_index"] - 4*self.header["start_index"])
-            else:
-                data = file.read()
+        sampsize = self.header["bytes_per_sample"]
+        with (open(self.path, 'rb') as file):
+            offset_points_start = 0 if offset_points_start is None else offset_points_start
+
+            # the first point is the first from the file + the specified offset
+            start_idx = self.header["start_index"] + offset_points_start
+            # the nb of samples to read is the one specified if it exists or the nb of samples remaining before the end
+            # if it exists or the whole remaining file (-1)
+            to_read = points_to_keep if points_to_keep else \
+                self.header["end_index"] - start_idx if self.header["end_index"] else -1
+            file.seek(start_idx * self.header["bytes_per_sample"])
+            if points_to_keep or self.header["end_index"]:
+                 data = file.read(to_read if to_read==-1 else to_read * self.header["bytes_per_sample"])
         data = np.frombuffer(data, dtype=">f4")
 
         # now convert data to meaningful data
         data = butter_bandpass_filter(data, 1, 119, self.header["sampling_frequency"])
-        self.data = data * self.header["cnt_to_upa"]
+        data = data * self.header["cnt_to_upa"]
+        return data

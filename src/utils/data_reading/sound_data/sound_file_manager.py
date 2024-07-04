@@ -121,10 +121,11 @@ class SoundFilesManager:
                 self.cache = deque(list(self.cache)[:cache_idx] + list(cache_start))
             return self.cache[-1]
         # cache miss, in case the cache is full we remove its oldest item
-        if len(self.cache) == self.cache_size:
-            self.cache.popleft()
         file = self.FILE_CLASS(self._getPath(file_number), skip_data=skip_data, identifier=file_number)
-        self.cache.append(file)
+        if self.cache_size > 0:
+            if len(self.cache) == self.cache_size:
+                self.cache.popleft()
+            self.cache.append(file)
         return file
 
     def _locateFile(self, target_datetime, ref=(None, None), history=None):
@@ -197,10 +198,11 @@ class SoundFilesManager:
         file_numbers = range(first_file, last_file + 1)
         data = []
         for i, file_number in enumerate(file_numbers):
-            file = self._loadFile(file_number)
+            # if we have no cache, we don't load the file to memory
+            file = self._loadFile(file_number, skip_data=(self.cache_size==0))
             file_data = file.get_data(start=start, end=end)
             data.extend(file_data)
-            next_start = end if i == len(file_numbers) - 1 else self._loadFile(file_numbers[i+1]).header["start_date"]
+            next_start = end if i == len(file_numbers) - 1 else self._loadFile(file_numbers[i+1], skip_data=True).header["start_date"]
             # in case the "gap" is larger than a file, we may have untouched the first file whose end may be far before
             # the value of start. In this case, we have to consider only the values after start and pad with 0
             previous_end = file.header["end_date"] if len(file_data) > 0 else start
@@ -239,7 +241,7 @@ class DatFilesManager(SoundFilesManager):
 
 class WFilesManager(SoundFilesManager):
     """ Class accounting for .w files specific of CTBTO.
-    Virtually, we represent 1 record (1 line of .wfdisc) by 1 file.
+    Virtually, we represent 1 record (1 line of .wfdisc) by 1 file (1 instance of WFile).
     """
     FILE_CLASS = WFile
 
