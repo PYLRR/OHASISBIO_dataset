@@ -130,7 +130,7 @@ class SoundFilesManager:
             self.cache.append(file)
         return file
 
-    def _locateFile(self, target_datetime, ref=(None, None), history=None):
+    def _locateFile(self, target_datetime, ref=(None, None), history=None, round_down=True):
         """ Find a file containing a given datetime and return its index.
         The function is made recursive and enables to use a specific file as a time reference to find the index we look
         for. This is made to face clock drift, float imprecision or other problems leading to a wrong file number
@@ -138,6 +138,8 @@ class SoundFilesManager:
         :param target_datetime:  The datetime we look for.
         :param ref: The file we use as a time reference to guess the index we look for, format (date,file_number).
         :param history: History of visited files, if we visit two times the same file it means there is a problem.
+        :param round_down: If True, choose the previous correct file in case the required time is not in the dataset.
+        Otherwise, choose the next one.
         :return: The index of the file we look for, also keeping the decimal part (e.g. 1.5 if the datetime is half the
         way between file 1 and 2), or last valid index before the provided datetime in case it is unavailable.
         """
@@ -181,7 +183,7 @@ class SoundFilesManager:
         assert start >= self.dataset_start - TIMEDELTA_EPSILON, "start is before the first file"
         assert end <= self.dataset_end + TIMEDELTA_EPSILON, "end is after the last file"
 
-        first_file, last_file = self._locateFile(start), self._locateFile(end)
+        first_file, last_file = self._locateFile(start), self._locateFile(end, round_down=True)
         first_file = math.floor(first_file)
         last_file = math.floor(last_file)
         return first_file, last_file
@@ -305,9 +307,14 @@ class WFilesManager(SoundFilesManager):
         """
         return 0, len(self.files) - 1
 
-    def _locateFile(self, target_datetime, ref=(None, None), history=None):
+    def _locateFile(self, target_datetime, ref=(None, None), history=None, round_down=True):
         closest = np.argmin(np.abs(target_datetime - self.start_dates))
-        return closest-1 if target_datetime < self.files[closest][1] else closest
+        if round_down:
+            closest = closest - 1 if target_datetime < self.files[closest][1] else closest
+        else:
+            closest = closest - 1 if target_datetime < self.files[closest][1] and target_datetime < \
+                                     self.files[closest - 1][2] else closest
+        return closest
 
 def make_manager(path):
     """ Looks for the extension of the files in the given directory and returns the correct files manager.

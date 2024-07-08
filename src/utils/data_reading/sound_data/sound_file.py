@@ -96,7 +96,8 @@ class SoundFile:
             # select the data ending before end
             keep = end - (max(start, self.header["start_date"]) if start else self.header["start_date"])
             points_to_keep = int(keep.total_seconds() * self.header["sampling_frequency"])
-            points_to_keep = None if points_to_keep > self.header["samples"] else points_to_keep
+            max_possible_length = self.header["samples"] - offset_points_start if offset_points_start else self.header["samples"]
+            points_to_keep = None if points_to_keep > max_possible_length else points_to_keep
 
         data = self.read_data_subpart(offset_points_start, points_to_keep)
         return data
@@ -236,10 +237,10 @@ class WFile(SoundFile):
         :param points_to_keep: Number of points to keep. None in case we keep everything after the start.
         :return: The required data.
         """
-        sampsize = self.header["bytes_per_sample"]
         with (open(self.path, 'rb') as file):
             offset_points_start = 0 if offset_points_start is None else offset_points_start
-
+            if offset_points_start > self.header["samples"]:
+                return []  # the required time is after the file because it is in a no-data section
             # the first point is the first from the file + the specified offset
             start_idx = self.header["start_index"] + offset_points_start
             # the nb of samples to read is the one specified if it exists or the nb of samples remaining before the end
@@ -247,8 +248,7 @@ class WFile(SoundFile):
             to_read = points_to_keep if points_to_keep else \
                 self.header["end_index"] - start_idx if self.header["end_index"] else -1
             file.seek(start_idx * self.header["bytes_per_sample"])
-            if points_to_keep or self.header["end_index"]:
-                 data = file.read(to_read if to_read==-1 else to_read * self.header["bytes_per_sample"])
+            data = file.read(to_read if to_read==-1 else to_read * self.header["bytes_per_sample"])
         data = np.frombuffer(data, dtype=">f4")
 
         # now convert data to meaningful data
