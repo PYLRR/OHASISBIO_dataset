@@ -21,12 +21,15 @@ pip3 install -r data/requirements-3.10.14.txt
 ### Data
 To run the code of this project, acoustic data are necessary. Consider downloading the *OHASISBIO-2018* dataset, formatted
 with .wav files named with a timestamp. The *OHASISBIO-2020* and *HYDROMOMAR* datasets are also available for download.
-Once the download is finished, open the file **dataset.yaml** from *OHASISBIO-2018* folder, and modify the values 
-of the fields **root_dir** to the paths of the datasets.
+To download them, using the GNU tool wget, one can run the following in a terminal:
+```
+wget -r --no-parent https://data-dataref.ifremer.fr/hydro-ac-passive-public/
+```
 
 ### Visualizing the data
 A graphical software is made available with this project. This enables to quickly take a look at the data, by first
-choosing a directory to inspect and then by exploring it with spectrograms. The following gif shows an example.
+choosing a directory (e.g. one of the three datasets obtained with the download) to inspect and then by exploring it 
+with spectrograms. The following gif shows an example.
 
 <p align="center">
   <img src="data/README/soft.gif" alt="Animated gif of the software" />

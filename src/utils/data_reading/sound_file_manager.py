@@ -6,7 +6,7 @@ from collections import deque
 
 import numpy as np
 
-from utils.data_reading.sound_file import SoundFile, WavFile
+from src.utils.data_reading.sound_file import SoundFile, WavFile
 
 # epsilon to compare two close datetimes
 TIMEDELTA_EPSILON = datetime.timedelta(microseconds=10**4)

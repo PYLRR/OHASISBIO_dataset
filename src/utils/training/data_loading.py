@@ -152,14 +152,15 @@ def get_load_spectro_for_class(size=128, channels=1):
     :return:
     """
 
-    def load_spectro_for_class(file_path):
+    def load_spectro_for_class(data):
         """ Function that takes some file_path and outputs couples (waveforms, ground_truth_curves).
-        :param file_path: The path of the spectrogram file.
+        :param data: The path of the spectrogram file and the indexes of positive parts if any.
         :return: A couple (waveforms, class) made of tensors with class belonging to {0, 1}.
         """
+        file_path = data[0]
         img = load_spectro(file_path, (size, size), channels)
 
-        if tf.strings.regex_full_match(file_path, ".*negatives.*"):
+        if tf.strings.regex_full_match(data[1], ".*negative.*"):
             return img, 0
         else:
             return img, 1

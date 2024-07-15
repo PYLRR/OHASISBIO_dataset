@@ -17,11 +17,11 @@ def evaluate_peaks(ground_truth, detections, allowed_error):
     TP = []
     FP = 0
     # prediction scores of the whole segments rather than the peaks
-    TP_per_seg = []
-    FP_per_seg = []
+    TP_per_seg = {}  # {seg_id : predicted_score}
+    FP_per_seg = {}  # {seg_id : predicted_score}
     N_per_seg = 0
     P_per_seg = 0
-    FN_per_seg = 0
+    FN_per_seg = []  # list of seg_ids
 
     # browse segments
     for i in range(len(detections)):
@@ -29,7 +29,7 @@ def evaluate_peaks(ground_truth, detections, allowed_error):
             N_per_seg += 1
             if len(detections[i]) > 0:
                 heights = [det[1] for det in detections[i]]
-                FP_per_seg.append(np.max(heights))
+                FP_per_seg[i] = np.max(heights)
                 FP += len(detections[i])
             continue
         # dict associating each ground truth peak index to its corresponding model output peak
@@ -59,12 +59,11 @@ def evaluate_peaks(ground_truth, detections, allowed_error):
         # the FP/TP per segment only increases by 1
         if len(detections[i]) > 0:
             heights = [det[1] for det in detections[i]]
-            TP_per_seg.append(np.max(heights))
+            TP_per_seg[i] = np.max(heights)
         else:
-            FN_per_seg += 1
+            FN_per_seg.append(i)
 
-    TN_per_seg = N_per_seg - len(FP_per_seg)
-    TP_per_seg = np.array(TP_per_seg)
+    TN_per_seg = N_per_seg - len(list(FP_per_seg.keys()))
 
     return TP, FP, TP_per_seg, TN_per_seg, FP_per_seg, FN_per_seg, P_per_seg, N_per_seg
 
