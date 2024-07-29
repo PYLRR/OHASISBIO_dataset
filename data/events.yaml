@@ -1,0 +1,56 @@
+Cryogenic_1:
+  dataset: test_dataset_OHASISBIO
+  station: ELAN
+  segment_duration_s: 750
+  segment_center: 20200606_153730
+
+T-wave_1:
+  dataset: test_dataset_OHASISBIO
+  station: RTJ
+  segment_duration_s: 75
+  segment_center: 20200606_045700
+
+T-wave_2:
+  dataset: test_dataset_OHASISBIO
+  station: RTJ
+  segment_duration_s: 75
+  segment_center: 20200606_194415
+
+T-wave_3:
+  dataset: test_dataset_OHASISBIO
+  station: RTJ
+  segment_duration_s: 75
+  segment_center: 20200606_221520
+
+T-wave_4:
+  dataset: test_dataset_OHASISBIO
+  station: RTJ
+  segment_duration_s: 200
+  segment_center: 20200607_034350
+  arrow_offset: -46
+
+H-wave_1:
+  dataset: test_dataset_OHASISBIO
+  station: WKER2
+  segment_duration_s: 200
+  segment_center: 20200609_072500
+  arrow_offset: 0
+
+Uncertain_1:
+  dataset: test_dataset_HYDROMOMAR
+  station: LS
+  segment_duration_s: 200
+  segment_center: 20131111_021340
+  arrow_offset: 0
+
+Ship-noise_1:
+  dataset: test_dataset_HYDROMOMAR
+  station: M6
+  segment_duration_s: 200
+  segment_center: 20131111_095000
+
+Antarctic-blue-whale-Z-calls_1:
+  dataset: train_dataset
+  station: SSEIR
+  segment_duration_s: 200
+  segment_center: 20180626_012905
