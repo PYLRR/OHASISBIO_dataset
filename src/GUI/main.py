@@ -15,7 +15,7 @@ if __name__ == "__main__":
 
 
     datasets_yaml = "/home/plerolland/Bureau/dataset.yaml"
-    isc_file = "/home/plerolland/Bureau/catalogs/ISC/eqk_isc_2017.txt"
+    isc_file = "/home/plerolland/Bureau/catalogs/ISC/eqk_isc_revbull_2011.txt"
     ross_file = "/home/plerolland/Téléchargements/temp/EA_CTBTO_catalog_all.dat"
     tissnet_checkpoint = "../data/model_saves/TiSSNet/all/cp-0022.ckpt"
 

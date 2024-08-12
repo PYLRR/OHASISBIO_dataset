@@ -317,7 +317,7 @@ class SpectralView(QtWidgets.QWidget):
             self.freq_range[0] -= delta_bot
             self.freq_range[1] += delta_top
 
-        elif key.key == "shift+enter":
+        elif key.key == "ctrl+enter":
             # put all the SpectralView widgets of the parent window to the same configuration
             segment_center = QdatetimeToDatetime(self.segment_date_dateTimeEdit.date(),
                                                  self.segment_date_dateTimeEdit.time())

@@ -1,8 +1,6 @@
 from pathlib import Path
 
-import pywt
 from scipy import signal
-from scipy.fft import fft
 import datetime
 import os.path
 
@@ -15,8 +13,8 @@ from line_profiler_pycharm import profile
 
 from utils.data_reading.catalogs.isc import ISC_file
 from utils.data_reading.sound_data.station import StationsCatalog
-from utils.physics.bathymetry_model import BathymetryModel
-from utils.physics.sound_model import MonthlyGridSoundModel, HomogeneousSoundModel
+from utils.physics.grid.bathymetry_grid import BathymetryModel
+from utils.physics.sound_model import HomogeneousSoundModel
 from utils.training.TiSSNet import TiSSNet
 from utils.transformations.features_extractor import STFTFeaturesExtractor
 
@@ -57,11 +55,11 @@ def compute_peaks(time_series, station, time, global_welch, min_height, distance
 if __name__=="__main__":
     @profile
     def main():
-        for year in [2020]:
+        for year in [2013, 2014]:
             print(f"STARTING {year} at {datetime.datetime.now()}")
             # input files
             datasets_yaml = "/home/plerolland/Bureau/dataset.yaml"
-            isc_file = f"/home/plerolland/Bureau/catalogs/ISC/eqk_isc_{year}.txt"
+            isc_file = f"/home/plerolland/Bureau/catalogs/ISC/eqk_isc_revbull_{year}.txt"
             velocities_file = "../../../data/geo/velocities_grid.pkl"
             bathy_file = "../../../data/geo/GEBCO_2023_sub_ice_topo.nc"
             tissnet_checkpoint = "../../../data/model_saves/TiSSNet/all/cp-0022.ckpt"

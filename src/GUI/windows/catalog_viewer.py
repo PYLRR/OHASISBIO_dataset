@@ -144,16 +144,15 @@ class CatalogViewer(SpectralViewerWindow):
 
         self.setCentralWidget(self.scroll)
 
-        # add a vertical layout to contain SpectralView widgets
-        self.scrollVerticalLayout = QVBoxLayout()
-        self.verticalLayout.addLayout(self.scrollVerticalLayout)
-
     def clear_spectral_views(self):
         """ Clear the spectral views window and the internal list of them.
         :return: None.
         """
-        for i in reversed(range(self.scrollVerticalLayout.count())):
-            self.scrollVerticalLayout.itemAt(i).widget().setParent(None)
+        for i in reversed(range(0, self.verticalLayout.count())):
+            w = self.verticalLayout.itemAt(i).widget()
+            # we check w is indeed a widget because we don't want to delete a layout
+            if w is not None:
+                w.setParent(None)
         self.SpectralViews.clear()
 
     def pick_prev(self):
@@ -175,14 +174,14 @@ class CatalogViewer(SpectralViewerWindow):
         :return: None
         """
         self.current_ID_idx = int(self.eventIndexEdit.toPlainText())
-        self.pick_current(force=True)
+        self.pick_current()
 
     def eventIDEdit_enter(self):
         """ Pick the event whose ID is indexed by the user in the top panel.
         :return: None
         """
         self.current_ID_idx = np.argmin(np.abs(np.array(self.IDs) - int(self.eventIDEdit.toPlainText())))
-        self.pick_current(force=True)
+        self.pick_current()
 
     def is_current_idx_valid(self):
         """ Check if the current index corresponds to a valid event.

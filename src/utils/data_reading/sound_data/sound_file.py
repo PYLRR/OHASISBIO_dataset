@@ -210,8 +210,8 @@ class DatFile(SoundFile):
         data = np.frombuffer(valid_data[:, ::-1].tobytes(), dtype=np.int32)
 
         # now convert data to meaningful data
-        data = butter_bandpass_filter(data, 1, 119, self.header["sampling_frequency"])
         data = data * self.TO_VOLT / 10 ** (self.SENSIBILITY / 20)
+        data = butter_bandpass_filter(data, 1, 119, self.header["sampling_frequency"])
         return data
 
 class WFile(SoundFile):
