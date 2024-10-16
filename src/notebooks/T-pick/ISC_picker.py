@@ -9,21 +9,18 @@ from scipy.signal import find_peaks, peak_widths
 from tqdm import tqdm
 import pickle
 import tensorflow as tf
-from line_profiler_pycharm import profile
 
-from utils.data_reading.catalogs.isc import ISC_file
+from utils.data_reading.catalogs.ISC import ISC_file
 from utils.data_reading.sound_data.station import StationsCatalog
-from utils.physics.grid.bathymetry_grid import BathymetryModel
-from utils.physics.sound_model import HomogeneousSoundModel
+from utils.physics.bathymetry.bathymetry_grid import BathymetryGrid
+from utils.physics.sound.sound_model import HomogeneousSoundModel
 from utils.training.TiSSNet import TiSSNet
 from utils.transformations.features_extractor import STFTFeaturesExtractor
 
-@profile
 def apply_TiSSNet(batch, model):
     stft = tf.convert_to_tensor(batch, dtype=tf.uint8)
     return model.predict(stft, verbose=True, batch_size=32)
 
-@profile
 def apply_sta_lta(manager, time, delta, sta_delta, sf_to_mimic=240):
     sta_offset = int(sta_delta.total_seconds() * 2 * manager.sampling_f)
     pts_sta = manager.getSegment(time - delta - sta_delta, time + delta + sta_delta)
@@ -33,7 +30,6 @@ def apply_sta_lta(manager, time, delta, sta_delta, sf_to_mimic=240):
     return stas / lta
 
 
-@profile
 def compute_peaks(time_series, station, time, global_welch, min_height, distance, height_ratio_for_width, time_res, delta, prominence=None):
     global_energy = np.sum(global_welch[1][1:])
 
@@ -53,9 +49,8 @@ def compute_peaks(time_series, station, time, global_welch, min_height, distance
     return peaks
 
 if __name__=="__main__":
-    @profile
     def main():
-        for year in [2013, 2014]:
+        for year in []:
             print(f"STARTING {year} at {datetime.datetime.now()}")
             # input files
             datasets_yaml = "/home/plerolland/Bureau/dataset.yaml"
@@ -83,7 +78,7 @@ if __name__=="__main__":
             isc = ISC_file(isc_file)
             IDs = list(isc.items.keys())
             sound_model = HomogeneousSoundModel()
-            bathy_model = BathymetryModel(bathy_file, lat_bounds=[-75, 35], lon_bounds=[-20, 180])
+            bathy_model = BathymetryGrid.create_from_NetCDF(bathy_file, lat_bounds=[-75, 35], lon_bounds=[-20, 180])
             stft_computer = STFTFeaturesExtractor(None, vmin=-35, vmax=140)
             model = TiSSNet()
             model.load_weights(tissnet_checkpoint)
@@ -125,13 +120,16 @@ if __name__=="__main__":
                 batch_n += 1
                 for _ in tqdm(range(min(len(to_process) - idx, batch_size)), desc="loading data"):
                     _, station, time = to_process[idx]
-                    batch_meta.append(to_process[idx])
                     idx += 1
                     manager = station.get_manager()
                     manager.cache_size = 0
 
                     stft_computer.manager = manager
+                    if time>manager.dataset_end:
+                        print(f"Out of bounds for station {manager.station_name}-{manager.dataset_start.year}")
+                        continue
                     data = manager.getSegment(time - DELTA, time + DELTA)
+                    batch_meta.append(to_process[idx-1])
                     batch.append(stft_computer._get_features(data)[-1].astype(np.uint8))
                     batch_PSDs.append(signal.welch(data, manager.sampling_f, 'flattop', 64, scaling='spectrum'))
                     batch[-1] = np.expand_dims(batch[-1], axis=-1)
@@ -158,7 +156,7 @@ if __name__=="__main__":
                     if ID not in detections:
                         detections[ID] = []
 
-                    bathy_profile = bathy_model.get_bathymetry_along_path(isc[ID].get_pos(), station.get_pos())
+                    bathy_profile = bathy_model.get_along_path_nearest(isc[ID].get_pos(), station.get_pos())[0]
 
                     detections[ID].append((station.light_copy(), time, batch_PSDs[i], tissnet_peaks, sta_lta_peaks, np.max(bathy_profile)))
 

@@ -180,6 +180,10 @@ class SpectralView(QtWidgets.QWidget):
         """ Update the segment date slider after the editor is changed.
         :return: None.
         """
+        new_date = QdatetimeToDatetime(self.segment_date_dateTimeEdit.date(),
+                                      self.segment_date_dateTimeEdit.time())
+        old_date = self.manager.dataset_start + datetime.timedelta(seconds=self.segment_date_slider.value())
+        self.spectralViewer.notify_delta(new_date - old_date, self)
         self.segment_date_slider.setValue((QdatetimeToDatetime(self.segment_date_dateTimeEdit.date(),
                                                                self.segment_date_dateTimeEdit.time()) - self.manager.dataset_start).total_seconds())
 

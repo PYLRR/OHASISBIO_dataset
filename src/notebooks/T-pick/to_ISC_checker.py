@@ -4,7 +4,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from utils.data_reading.catalogs.isc import ISC_file
+from utils.data_reading.catalogs.ISC import ISC_file
 from utils.data_reading.sound_data.station import StationsCatalog
 from utils.transformations.features_extractor import STFTFeaturesExtractor
 

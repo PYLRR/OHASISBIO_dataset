@@ -7,7 +7,7 @@ from utils.data_reading.sound_data.sound_file_manager import make_manager
 
 class Station:
     def __init__(self, path, name=None, lat=None, lon=None, date_start=None, date_end=None, dataset=None,
-                 initialize_metadata=False):
+                 initialize_metadata=False, other_kwargs=None):
         self.manager = None
         self.path = path
         assert isinstance(path, str)
@@ -23,6 +23,7 @@ class Station:
         self.lat = lat
         self.lon = lon
         self.dataset = dataset
+        self.other_kwargs = other_kwargs
         if initialize_metadata:
             self.get_manager()
             self.name = name or self.manager.station_name
@@ -35,7 +36,7 @@ class Station:
 
     def load_data(self):
         if self.path and not self.manager:
-            self.manager = make_manager(self.path)
+            self.manager = make_manager(self.path, self.other_kwargs)
 
     def get_pos(self):
         """ Get an array representing the position of the station.
@@ -47,7 +48,8 @@ class Station:
         """ Make a copy of this station, only including metadata.
         :return: A copy of self containing the name, lat, lon, dates, path and dataset of the station.
         """
-        return Station(self.path, self.name, self.lat, self.lon, self.date_start, self.date_end, self.dataset)
+        return Station(self.path, self.name, self.lat, self.lon, self.date_start, self.date_end, self.dataset,
+                       other_kwargs=self.other_kwargs)
 
     def __str__(self):
         return f"station_{self.name}_{self.date_start.year}"
@@ -78,12 +80,16 @@ class StationsCatalog():
                 date_start, date_end, lat, lon = None, None, None, None
                 if station_yaml["date_start"].strip() != "":
                     date_start = datetime.datetime.strptime(station_yaml["date_start"], "%Y%m%d_%H%M%S")
+                    del station_yaml["date_start"]
                 if station_yaml["date_end"].strip() != "":
                     date_end = datetime.datetime.strptime(station_yaml["date_end"], "%Y%m%d_%H%M%S")
+                    del station_yaml["date_end"]
                 if station_yaml["lat"].strip() != "":
                     lat, lon = float(station_yaml["lat"]), float(station_yaml["lon"])
+                    del station_yaml["lat"], station_yaml["lon"]
 
-                st = Station(f"{path}/{station_name}", station_name, lat, lon, date_start, date_end, dataset)
+                st = Station(f"{path}/{station_name}", station_name, lat, lon, date_start, date_end, dataset,
+                             other_kwargs=station_yaml)
                 self.stations.append(st)
 
     def add_station(self, station):
@@ -120,9 +126,16 @@ class StationsCatalog():
         res = StationsCatalog()
         for st in self.stations:
             for date in dates:
-                if st.date_start < date < st.date_end:
+                if st not in res.stations and st.date_start < date < st.date_end:
                     res.add_station(st)
                     break
+        return res
+
+    def by_starting_year(self, year):
+        res = StationsCatalog()
+        for st in self.stations:
+            if year == st.date_start.year:
+                res.add_station(st)
         return res
 
     def starts_before(self, date):
@@ -144,7 +157,7 @@ class StationsCatalog():
         times_of_prop = []
         delta = delta or datetime.timedelta(seconds=0)
         for st in self.stations:
-            time_of_prop = sound_model.get_sound_travel_time(event.get_pos(), st.get_pos(), month=event.date.month)
+            time_of_prop = sound_model.get_sound_travel_time(event.get_pos(), st.get_pos(), event.date)
             if not time_of_prop:
                 continue
             time_of_arrival = event.date + datetime.timedelta(seconds=time_of_prop)

@@ -5,7 +5,7 @@ import glob2
 from utils.data_reading.catalogs.association import Association
 from utils.data_reading.catalogs.catalog import Catalog, merge_catalogs
 from utils.data_reading.catalogs.events import AcousticReceptionWithData
-from utils.data_reading.catalogs.isc import ISC_file
+from utils.data_reading.catalogs.ISC import ISC_file
 
 class TwinAssociation():
     """ Class representing a twin association, that is an acoustic Association instance linked with an ISC event."""
@@ -48,10 +48,16 @@ class TwinCatalog(Catalog):
             association = []
             for station in stations_used:
                 station_params = station.split("/")[-1][:-4].split("_")
+                if "COLMEIA" in station_params[0]:
+                    # particularity : colmeia stations have "_" in their names
+                    station_params[0] = station_params[0]+"_"+station_params[1]
+                    station_params[1:] = station_params[2:]
                 station_name, date = station_params[0], datetime.datetime.strptime(
                     f"{station_params[1]}_{station_params[2]}", "%Y%m%d_%H%M%S")
-                station_object = stations.by_date(date).by_names(station_name)[0]
-                association.append(AcousticReceptionWithData(station_object, date, station))
+                station_object = stations.by_date(date).by_names(station_name)
+                assert len(station_object) > 0, f"0 station found for {station_name} - {date}"
+                for st in station_object:
+                    association.append(AcousticReceptionWithData(st, date, station))
 
             assert ID not in self.items, f"ID {ID} already in catalog."
             self.items[ID] = TwinAssociation(Association(association), self.isc[ID])

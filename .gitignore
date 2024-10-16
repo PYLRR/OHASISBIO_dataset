@@ -1,4 +1,9 @@
+*temp*
+
 # data
+*.csv
+*.pickle
+*.npy
 data/*
 src/huge_dataset_project
 

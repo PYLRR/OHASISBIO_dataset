@@ -2,6 +2,7 @@ import datetime
 
 import glob2
 import numpy as np
+import torch
 import yaml
 
 from PySide6.QtWidgets import QFileDialog, QVBoxLayout, QScrollArea, QWidget, QInputDialog, QCheckBox, QSizePolicy, \
@@ -9,26 +10,36 @@ from PySide6.QtWidgets import QFileDialog, QVBoxLayout, QScrollArea, QWidget, QI
 from PySide6.QtCore import (Qt)
 from PySide6.QtGui import (QAction)
 from PySide6.QtWidgets import (QMainWindow, QToolBar)
+from skimage.transform import resize
 
-from GUI.widgets.spectral_view import SpectralView, QdatetimeToDatetime
-from GUI.widgets.spectral_view_tissnet import SpectralViewTissnet
+from GUI.widgets.spectral_view import SpectralView, QdatetimeToDatetime, DatetimeToQdatetime
+from GUI.widgets.spectral_view_augmented import SpectralViewTissnet
 from utils.data_reading.catalogs.events import AcousticEmission
 from utils.data_reading.sound_data.station import Station, StationsCatalog
-from utils.physics.sound_model import HomogeneousSoundModel
-from utils.training.TiSSNet import TiSSNet
+from utils.physics.sound.sound_model import HomogeneousSoundModel
+from utils.physics.sound.sound_velocity_grid import MonthlySoundVelocityGridOptimized
 
 MIN_SPECTRAL_VIEW_HEIGHT = 400
 DELTA_VIEW_S = 200
 class SpectralViewerWindow(QMainWindow):
     """ Window containing several SpectralView widgets and enabling to import them one by one or in group.
     """
-    def __init__(self, database_yaml, tissnet_checkpoint=None):
+    def __init__(self, database_yaml, tissnet_checkpoint=None, embedder_checkpoint=None):
         """ Constructor initializing the window and setting its visual appearance.
         :param database_yaml: YAML file containing information about the available stations.
-        :param tissnet_checkpoint: Checkpoint of TiSSNet model in case we want to try detections.
+        :param tissnet_checkpoint: Checkpoint of TiSSNet model in case we want to try detection.
+        :param embedder_checkpoint: Checkpoint of embedder model in case we want to try association.
         """
+        # TiSSNet
+        self.detection_model = torch.load(tissnet_checkpoint, map_location="cpu") if tissnet_checkpoint else None
+        # embedder
+        self.association_model = torch.load(embedder_checkpoint, map_location="cpu") if embedder_checkpoint else None
+
+
         super().__init__()
         self.sound_model = HomogeneousSoundModel()
+        self.sound_model = MonthlySoundVelocityGridOptimized(
+    [f"../data/sound_model/min-velocities_month-{i:02d}.nc" for i in range(1, 13)], interpolate=True)
         self.stations = StationsCatalog(database_yaml).filter_out_undated().filter_out_unlocated()
 
         self.setWindowTitle(u"Acoustic viewer")
@@ -99,11 +110,6 @@ class SpectralViewerWindow(QMainWindow):
         # list of SpectralView widgets
         self.SpectralViews = []
 
-        # TiSSNet
-        self.model = None
-        if tissnet_checkpoint:
-            self.model = TiSSNet()
-            self.model.load_weights(tissnet_checkpoint)
 
     def _add_spectral_view(self, station, date=None):
         """ Given a station, create a spectral_view widget and add it to the window.
@@ -111,7 +117,7 @@ class SpectralViewerWindow(QMainWindow):
         :param date: The date at which the spectral_view will be focused, if None it will be the dataset start.
         :return: None.
         """
-        sv = SpectralView if self.model is None else SpectralViewTissnet
+        sv = SpectralView if self.detection_model is None else SpectralViewTissnet
         new_SpectralView = sv(self, station, date=date, delta_view_s=DELTA_VIEW_S)
         self.verticalLayout.addWidget(new_SpectralView)
         self.SpectralViews.append(new_SpectralView)
@@ -156,6 +162,18 @@ class SpectralViewerWindow(QMainWindow):
                 spectral_view.onkeyGraph_local(key)
         else:
             spectral_view.onkeyGraph_local(key)
+
+    def notify_delta(self, delta, spectral_view):
+        if self.broadcast_checkbox.isChecked():
+            for spectral_view_ in self.SpectralViews:
+                if spectral_view_ != spectral_view:
+                    segment_center = QdatetimeToDatetime(spectral_view_.segment_date_dateTimeEdit.date(),
+                                                         spectral_view_.segment_date_dateTimeEdit.time())
+                    segment_center += delta
+                    # we temporarily disable the broadcast checkbox to avoid recursive calls
+                    self.broadcast_checkbox.setChecked(False)
+                    spectral_view_.segment_date_dateTimeEdit.setDateTime(DatetimeToQdatetime(segment_center))
+                    self.broadcast_checkbox.setChecked(True)
 
     def clear_spectral_views(self):
         """ Clears the current window by removing all SpectralView widgets. Also clears top bar labels.
@@ -226,7 +244,29 @@ class SpectralViewerWindow(QMainWindow):
                                              s.segment_date_dateTimeEdit.time()) for s in self.SpectralViews if s.focused])
         src = self.sound_model.localize_common_source(sensors_positions, detection_times)
         time = detection_times[0] + np.mean([(detection_times[i] -
-                        datetime.timedelta(seconds=self.sound_model.get_sound_travel_time(src.x[1:], sensors_positions[i]))) - detection_times[0]
+                        datetime.timedelta(seconds=self.sound_model.get_sound_travel_time(src.x[1:], sensors_positions[i], detection_times[0]))) - detection_times[0]
                          for i in range(len(sensors_positions))])
         self.srcEstimateLabel.setText(f'Location estimate : {[float(f"{v:.2f}") for v in src.x]} at '
                                       f'{time.strftime("%Y%m%d_%H%M%S")} (cost {src.cost:.2f})')
+
+    def associate(self, ref_spectral_view):
+        ''' Run the embedder on all stations, taking as ref the selected one.
+        :param ref_spectral_view: The selected SpectralView (calling this method).
+        :return: None.
+        '''
+        time_res, half_focus = 0.5, 16
+        embedding_ref = ref_spectral_view.processEmbedder(margin=datetime.timedelta(seconds=10))
+        embedding_ref = embedding_ref[:, embedding_ref.shape[1]//2-half_focus:embedding_ref.shape[1]//2+half_focus]
+        embedding_ref = resize(embedding_ref, (16, 1+2*half_focus))
+        for spectral_view in self.SpectralViews:
+            if spectral_view != ref_spectral_view:
+                embedding = ref_spectral_view.processEmbedder(margin=datetime.timedelta(seconds=half_focus), keep_margin=True)
+                embedding = resize(embedding, (16, embedding.shape[1]))
+
+                half_duration = int((spectral_view.segment_length_doubleSpinBox.value() / 2) / time_res)
+                embedding = [embedding[:, embedding.shape[1]//2 + i - half_focus:embedding.shape[1]//2 + i + half_focus + 1] for i in
+                         range(-half_duration, half_duration + 1)]
+                embedding = np.array(embedding)
+                diff = np.sqrt(np.sum((embedding_ref[np.newaxis, :, :] - embedding) ** 2, axis=(1, 2)))
+                diff = diff / np.sqrt(len(diff) * 16 * 2)  # normalisation by max theoretical value
+                spectral_view.showModelResult(diff)

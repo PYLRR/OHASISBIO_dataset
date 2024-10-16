@@ -1,21 +1,15 @@
-import datetime
-
+import glob2
 import numpy as np
-import yaml
-from PySide6 import QtGui, QtCore
+from PySide6 import QtCore
 
 from PySide6.QtWidgets import QVBoxLayout, QScrollArea, QWidget, QHBoxLayout, QPushButton, QLabel, QTextEdit
-from PySide6.QtCore import (Qt, SIGNAL, Signal)
-from PySide6.QtWidgets import (QMainWindow)
+from PySide6.QtCore import (Qt)
 
-from GUI.widgets.spectral_view import SpectralView
-from GUI.widgets.spectral_view_tissnet import SpectralViewTissnet
 from GUI.windows.spectral_viewer import SpectralViewerWindow
-from utils.data_reading.catalogs.isc import ISC_file
-from utils.data_reading.sound_data.sound_file_manager import make_manager
+from utils.data_reading.catalogs.catalog import merge_catalogs
+from utils.data_reading.catalogs.ISC import ISC_file
 from utils.data_reading.sound_data.station import StationsCatalog
-from utils.physics.sound_model import MonthlyGridSoundModel, HomogeneousSoundModel
-from utils.training.TiSSNet import TiSSNet
+from utils.physics.sound.sound_model import HomogeneousSoundModel
 
 
 class CatalogViewer(SpectralViewerWindow):
@@ -38,15 +32,16 @@ class CatalogViewer(SpectralViewerWindow):
         return False
 
 
-    def __init__(self, database_yaml, catalog, velocity_profiles=None, tissnet_checkpoint=None):
+    def __init__(self, database_yaml, catalog_dir, velocity_profiles=None, tissnet_checkpoint=None, embedder_checkpoint=None):
         """ Initializes the window.
         :param database_yaml: Path where the list of available stations is given.
-        :param catalog: Catalog of events we want to inspect.
+        :param catalog_dir: Directory of the catalogs of events we want to inspect.
         :param velocity_profiles: Grid of velocities for better propagation estimations, if not provided a homogeneous
         model is used.
-        :param tissnet_checkpoint: Checkpoint of TiSSNet model in case we want to try detections.
+        :param tissnet_checkpoint: Checkpoint of TiSSNet model in case we want to try detection.
+        :param embedder_checkpoint: Checkpoint of embedder model in case we want to try association.
         """
-        super().__init__(database_yaml, tissnet_checkpoint)
+        super().__init__(database_yaml, tissnet_checkpoint, embedder_checkpoint)
         self.setWindowTitle(u"Catalog viewer")
 
         self.resize(1200, 800)  # size when windowed
@@ -61,17 +56,22 @@ class CatalogViewer(SpectralViewerWindow):
         self.stations = StationsCatalog(database_yaml).filter_out_undated().filter_out_unlocated()
 
         # catalog and current inspected ID initialization
-        self.catalog = catalog
+        files = glob2.glob(f"{catalog_dir}/*.txt")
+        catalogs = [ISC_file(f) for f in files]
+        self.catalog = merge_catalogs(catalogs)
         self.IDs = list(self.catalog.items.keys())
         self.eventIndexLabel.setText(f"/{len(self.IDs)}")
         self.current_ID_idx = 0
 
         # velocity model
         if velocity_profiles is not None:
-            self.sound_model = MonthlyGridSoundModel(profiles_checkpoint=velocity_profiles,
-                                               lat_bounds=[-72, 25], lon_bounds=[0, 180], step_paths=1)
+            pass
+            #self.sound_model = MonthlyGridSoundModel(profiles_checkpoint=velocity_profiles,
+             #                                  lat_bounds=[-72, 25], lon_bounds=[0, 180], step_paths=1)
         else:
-            self.sound_model = HomogeneousSoundModel()
+            pass
+
+        self.sound_model = HomogeneousSoundModel()
 
         self.pick_current()
 

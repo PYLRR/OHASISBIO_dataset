@@ -8,7 +8,7 @@ import numpy as np
 import scipy
 from tqdm import tqdm
 
-from utils.data_reading.sound_data.sound_file import SoundFile, WavFile, DatFile, WFile
+from utils.data_reading.sound_data.sound_file import SoundFile, WavFile, DatFile, WFile, NpyFile
 
 # epsilon to compare two close datetimes
 TIMEDELTA_EPSILON = datetime.timedelta(microseconds=10**4)
@@ -25,13 +25,15 @@ class SoundFilesManager:
     """
     FILE_CLASS = SoundFile  # type of the individual sound files
 
-    def __init__(self, path, cache_size=4, fill_empty_with_zeroes=True):
+    def __init__(self, path, cache_size=4, fill_empty_with_zeroes=True, kwargs=None):
         """ Constructor of the class that reads some files of the folder to get its global organization.
         :param path: Path of the directory containing the files that we want to manage.
         :param cache_size: Number of files to keep loaded in memory, so that if one is used again by the user
         :param fill_empty_with_zeroes: If True, any missing data point between the dataset bounds is replaced by a 0
+        :param kwargs: Other arguments as a dict, that can be used by particular FilesManager (e.g. sensitivity...).
         it is fast to load (FIFO fashion).
         """
+        self._process_kwargs(kwargs)
         self.path = path
         # get the files in the folder
         self._initialize_files()
@@ -52,6 +54,13 @@ class SoundFilesManager:
         # determine some properties of the dataset (covered period, sampling frequencies, ...)
         self._initialize_from_header()
 
+    def _process_kwargs(self, kwargs):
+        """ Do something with the available kwargs. (e.g. initialize sensitivity)
+        :param kwargs: Dict of additional arguments.
+        :return: None.
+        """
+        pass
+
     def _initialize_files(self):
         """ Get the list of the files in the directory.
         :return: None.
@@ -69,11 +78,9 @@ class SoundFilesManager:
         # get the first and last files indexes
         self.first_file_number, self.last_file_number = self._findFirstAndLastFileNumber()
         # open the first file to extract some of its properties
-        first_file = self.FILE_CLASS(self.files[self.first_file_number], skip_data=True,
-                                     identifier=self.first_file_number)
-
+        first_file = self._initialize_sound_file(self.files[self.first_file_number], True, self.first_file_number)
         # now look for the last file
-        last_file = self.FILE_CLASS(self.files[self.last_file_number], skip_data=True, identifier=self.last_file_number)
+        last_file = self._initialize_sound_file(self.files[self.last_file_number], True, self.last_file_number)
 
         # then read the properties of the dataset from the files
         self.dataset_start = first_file.header["start_date"]
@@ -104,6 +111,15 @@ class SoundFilesManager:
         """
         return self.files[file_number]
 
+    def _initialize_sound_file(self, path, skip_data, file_number):
+        """ Read a file and return the corresponding SoundFile instance.
+        :param path: Path of the file to load.
+        :param skip_data: If True, only read metadata.
+        :param file_number: Number of the file to use as ID.
+        :return: The SoundFile instance.
+        """
+        return self.FILE_CLASS(path, skip_data=skip_data, identifier=file_number)
+
     def _loadFile(self, file_number, skip_data=False):
         """ Read, add to cache and return a file given its file number, reading only the metadata if skip_data is True.
         In case the file already exists in cache, it is simply taken from memory (updating the cache).
@@ -123,7 +139,7 @@ class SoundFilesManager:
                 self.cache = deque(list(self.cache)[:cache_idx] + list(cache_start))
             return self.cache[-1]
         # cache miss, in case the cache is full we remove its oldest item
-        file = self.FILE_CLASS(self._getPath(file_number), skip_data=skip_data, identifier=file_number)
+        file = self._initialize_sound_file(self._getPath(file_number), skip_data, file_number)
         if self.cache_size > 0:
             if len(self.cache) == self.cache_size:
                 self.cache.popleft()
@@ -201,21 +217,29 @@ class SoundFilesManager:
 
         file_numbers = range(first_file, last_file + 1)
         data = []
+        previous_end = start
         for i, file_number in enumerate(file_numbers):
             # if we have no cache, we don't load the file to memory
             file = self._loadFile(file_number, skip_data=(self.cache_size==0))
-            file_data = file.get_data(start=start, end=end)
-            data.extend(file_data)
+
+            # check the file indeed includes wanted data (rounding errors may lead to load a useless file or we may be
+            # in a data leap)
+
+            file_data = []
+            if file.header["end_date"] > start and file.header["start_date"] < end:
+                file_data = file.get_data(start=previous_end, end=end)
+                data.extend(file_data)
+
             next_start = end if i == len(file_numbers) - 1 else self._loadFile(file_numbers[i+1], skip_data=True).header["start_date"]
-            # in case the "gap" is larger than a file, we may have untouched the first file whose end may be far before
+            # in case a leap is larger than a file, we may have untouched the first file whose end may be before
             # the value of start. In this case, we have to consider only the values after start and pad with 0
-            previous_end = file.header["end_date"] if len(file_data) > 0 else start
-            if previous_end < next_start and self.fill_empty_with_zeroes:
-                data.extend([0] * np.rint((next_start - previous_end).total_seconds() * self.sampling_f).
+            previous_end = file.header["end_date"] if len(file_data) > 0 else previous_end
+            if previous_end < next_start and previous_end < end and self.fill_empty_with_zeroes:
+                data.extend([0] * np.rint((min(next_start, end) - previous_end).total_seconds() * self.sampling_f).
                             astype(int))
 
         if len(data) == 0:
-            print(f"0-length data fetched for files {file_numbers} from date {start} to {end}")
+            print(f"0-length data fetched for files {file_numbers} from date {start} to {end} (station {self.station_name})")
 
         return np.array(data)
 
@@ -251,15 +275,43 @@ class SoundFilesManager:
         if type(self) == type(other) and other.path == self.path:
             return True
         return False
+
 class WavFilesManager(SoundFilesManager):
     """ Class accounting for .wav files.
     """
     FILE_CLASS = WavFile
 
+class NpyFilesManager(SoundFilesManager):
+    """ Class accounting for .npy files.
+    """
+    FILE_CLASS = NpyFile
+
+    def getSegment(self, start, end):
+        data = super().getSegment(start, end)
+        data = np.swapaxes(data, 0, 1)
+        return data
+
 class DatFilesManager(SoundFilesManager):
     """ Class accounting for .dat files specific of GEO-OCEAN lab.
     """
     FILE_CLASS = DatFile
+
+    def _process_kwargs(self, kwargs):
+        """ Initilize sensitivity.
+        :param kwargs: Dict of additional arguments.
+        :return: None.
+        """
+        self.sensitivity = float(kwargs["sensitivity"]) \
+            if kwargs is not None and "sensitivity" in kwargs else -163.5  # default
+
+    def _initialize_sound_file(self, path, skip_data, file_number):
+        """ Read a file and return the corresponding SoundFile instance.
+        :param path: Path of the file to load.
+        :param skip_data: If True, only read metadata.
+        :param file_number: Number of the file to use as ID.
+        :return: The SoundFile instance.
+        """
+        return self.FILE_CLASS(path, self.sensitivity, skip_data=skip_data, identifier=file_number)
 
 class WFilesManager(SoundFilesManager):
     """ Class accounting for .w files specific of CTBTO.
@@ -289,8 +341,11 @@ class WFilesManager(SoundFilesManager):
             cnt_to_upa = [float(line[9]) for line in lines]
             name = [str(line[0]) for line in lines]
             vfiles.extend(zip(paths, starts, ends, indexes_start, indexes_end, sfs, cnt_to_upa, name))
-        self.files = vfiles
-        self.start_dates = np.array([f[1] for f in self.files])
+        self.start_dates = np.array([f[1] for f in vfiles])
+        # sort files by date
+        argsort = np.argsort(self.start_dates)
+        self.start_dates = self.start_dates[argsort]
+        self.files = np.array(vfiles)[argsort]
 
     def _getPath(self, file_number):
         """ Given an index of a vfile, return its path.
@@ -315,17 +370,18 @@ class WFilesManager(SoundFilesManager):
                                      self.files[closest - 1][2] else closest
         return closest
 
-def make_manager(path):
+def make_manager(path, kwargs):
     """ Looks for the extension of the files in the given directory and returns the correct files manager.
     :param path: The path of the directory we want to load.
+    :param kwargs: Other arguments as a dict, that can be used by particular FilesManager (e.g. sensitivity...).
     :return: A FilesManager instance able to load the files of the given directory, or None.
     """
     files = [f.split('.')[-1] for f in os.listdir(path)]
     if WavFile.EXTENSION in files:
-        return WavFilesManager(path)
+        return WavFilesManager(path, kwargs=kwargs)
     if DatFile.EXTENSION in files:
-        return DatFilesManager(path)
+        return DatFilesManager(path, kwargs=kwargs)
     if WFile.EXTENSION in files:
-        return WFilesManager(path)
+        return WFilesManager(path, kwargs=kwargs)
     print(f"No matching manager found for path {path}")
     return None

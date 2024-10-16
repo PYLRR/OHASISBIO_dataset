@@ -83,7 +83,8 @@ class SoundFile:
         :return: The required data.
         """
         if start is not None and end is not None:
-            assert end > start, "required end is before or equal to the start"
+            if start >= end:
+                return []
         offset_points_start, points_to_keep = None, None
 
         if start is not None:
@@ -98,6 +99,9 @@ class SoundFile:
             points_to_keep = int(keep.total_seconds() * self.header["sampling_frequency"])
             max_possible_length = self.header["samples"] - offset_points_start if offset_points_start else self.header["samples"]
             points_to_keep = None if points_to_keep > max_possible_length else points_to_keep
+
+        if points_to_keep is not None and points_to_keep<0:
+            return []
 
         data = self.read_data_subpart(offset_points_start, points_to_keep)
         return data
@@ -152,7 +156,17 @@ class DatFile(SoundFile):
     """
     EXTENSION = "DAT"
     TO_VOLT = 5.0 / 2 ** 24
-    SENSIBILITY = -163.5
+
+    def __init__(self, path, sensitivity, skip_data=False, identifier=None):
+        """ Constructor reading file metadata and content if required.
+        :param path: The path of the file.
+        :param sensitivity: Sensibility of the sensor.
+        :param skip_data: If True, we only read the metadata of the file. Else, we also read its content.
+        :param identifier: The ID of this file, that will be used to compare it with another file. If unspecified,
+        path is used.
+        """
+        self.sensitivity = sensitivity
+        super().__init__(path, skip_data, identifier)
 
     def _read_header(self):
         """ Read the metadata of the file using its header and update self.header.
@@ -210,7 +224,7 @@ class DatFile(SoundFile):
         data = np.frombuffer(valid_data[:, ::-1].tobytes(), dtype=np.int32)
 
         # now convert data to meaningful data
-        data = data * self.TO_VOLT / 10 ** (self.SENSIBILITY / 20)
+        data = data * self.TO_VOLT / 10 ** (self.sensitivity / 20)
         data = butter_bandpass_filter(data, 1, 119, self.header["sampling_frequency"])
         return data
 
@@ -254,4 +268,36 @@ class WFile(SoundFile):
         # now convert data to meaningful data
         data = butter_bandpass_filter(data, 1, 119, self.header["sampling_frequency"])
         data = data * self.header["cnt_to_upa"]
+        return data
+
+class NpyFile(SoundFile):
+    """ Class representing numpy .npy files. We expect npy files to be named with their start time as YYYYMMDD_hhmmss.
+    """
+    EXTENSION = "npy"
+
+    def _read_header(self):
+        """ Read the metadata of the file using its name and header and update self.header.
+        TODO specify this file is particular
+        :return: None.
+        """
+
+        self.data = self.get_data()
+        self.header["samples"] = len(self.data)
+
+        self.header["duration"] = datetime.timedelta(seconds=3600)
+        self.header["sampling_frequency"] = self.header["samples"] / self.header["duration"].total_seconds()
+        file_name = self.path.split("/")[-1][:-4]  # get the name of the file and get rid of extension
+        self.header["start_date"] = datetime.datetime.strptime(file_name, "%Y%m%d_%H%M%S")
+        self.header["end_date"] = self.header["start_date"] + self.header["duration"]
+
+    def _read_data_subpart_uncached(self, offset_points_start, points_to_keep):
+        """ Read and return the required data.
+        :param offset_points_start: Number of points to skip before the data part to keep. None if from the start.
+        :param points_to_keep: Number of points to keep. None in case we keep everything after the start.
+        :return: The required data.
+        """
+        data = np.load(self.path)
+        data = np.swapaxes(data, 0, 1)
+        data = data[offset_points_start:] if offset_points_start else data
+        data = data[:-points_to_keep] if points_to_keep else data
         return data
